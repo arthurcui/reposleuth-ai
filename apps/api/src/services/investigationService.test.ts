@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RepositoryError } from '../github/RepositoryProvider.js';
 import type { Model } from '@openai/agents';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -27,6 +28,19 @@ async function finish(service: InvestigationService, id: string) {
 }
 
 describe('investigation lifecycle and API', () => {
+  it.each(['NOT_FOUND', 'RATE_LIMITED'])('checks the issue before using the model: %s', async code => {
+    const repository = fakeRepository();
+    repository.getIssue = vi.fn().mockRejectedValue(new RepositoryError(code, 'Upstream details'));
+    const model = vi.fn(() => new ScriptedModel());
+    const service = new InvestigationService(new InvestigationStore(':memory:'), async () => repository, model);
+    resources.push(service);
+    const run = await finish(service, service.start(request).id);
+    expect(run).toMatchObject({ status: 'failed', errorCode: code === 'NOT_FOUND' ? 'ISSUE_NOT_FOUND' : code,
+      report: null, usage: { requests: 0, inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, reservedCostUsd: 0, usageIncomplete: false } });
+    expect(model).not.toHaveBeenCalled();
+    expect(repository.getIssue).toHaveBeenCalledWith(42);
+    expect(service.store.reserved()).toBe(0);
+  });
   it('queues via HTTP, completes, persists usage and replays SSE after a cursor', async () => {
     const service = make(); const app = buildApp(service);
     const started = await app.inject({ method: 'POST', url: '/api/investigations', payload: request });

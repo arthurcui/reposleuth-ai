@@ -74,6 +74,19 @@ Acceptance:
 
 ## Stage 4 — Investigation user experience
 
+Status: implemented. The React workspace supports submission, live SSE activity
+with polling fallback, cancellation, URL-based recovery, token/cost/duration metrics,
+terminal-state guidance, and evidence reports with immutable GitHub links.
+A labeled synthetic demo makes no API requests. All 65 tests, type checks, lint,
+and production builds pass. UI tests cover submission, cancellation, refresh,
+quota failures, a terminal-event race, source escaping, and link validation.
+Empty/non-JSON proxy responses show connection guidance. Requested issues are
+checked before model calls; missing issues fail without token usage or reservations.
+The demo was visually inspected in the browser's narrow panel; a wide-screen
+visual check remains pending. Successful real-model end-to-end verification
+remains blocked by the Stage 3 API credit shortage; fixture results are not a
+substitute for that acceptance check.
+
 Build repository/issue selection, question submission, live timeline, duration and
 token usage, evidence viewer, and final report. Link evidence to immutable GitHub
 commit URLs. Display confidence, uncertainty, missing evidence, and proposed fixes.

@@ -3,10 +3,12 @@
 Autonomous GitHub Issue & Code Investigator. Local, read-only investigation of
 public repositories with source evidence and actionable engineering reports.
 
-**Current checkpoint: Stage 3 — agent engine and durable API.** The backend runs a
-bounded investigation agent with six read-only GitHub tools, validates citations,
-and persists reports, usage, and progress in SQLite. The frontend remains the
-foundation shell; investigation controls and reports arrive in Stage 4.
+**Current checkpoint: Stage 4 — investigation user experience.** Submit a public
+GitHub repository and question, follow live tool activity, and inspect reports with
+line-numbered evidence, confidence, uncertainty, and proposed fixes. The backend
+persists reports, usage, and progress in SQLite. A clearly labeled synthetic demo
+works without credentials or paid requests. Successful live model verification
+still awaits API credits (see verification below).
 See [the staged implementation plan](IMPLEMENTATION_PLAN.md) for acceptance checks.
 
 ## Requirements
@@ -39,8 +41,29 @@ Health responses contain no configuration values or secrets.
 npm run check
 ```
 
-This runs TypeScript checks, ESLint, Vitest API integration tests, and production
-builds. Tests use Fastify injection and need no external APIs or paid calls.
+This runs TypeScript checks, ESLint, Vitest API and React interaction tests, and
+production builds. Tests need no external APIs or paid calls.
+
+## Investigation workspace (Stage 4)
+
+1. Open http://127.0.0.1:5173 and enter a public GitHub URL or `owner/repository`.
+2. Optionally enter an issue number, then describe what to investigate.
+3. Select **Investigate** to start a bounded, billable API run. Watch the activity
+   timeline, elapsed duration, input/output tokens, and estimated cost. **Stop
+   investigation** requests cancellation; already submitted requests may incur cost.
+4. Review the report, expand source evidence, and use immutable GitHub links to
+   inspect the cited commit. Suggestions and test plans have not been executed.
+
+The URL stores the investigation ID, so refreshing or reopening that URL restores
+the persisted result on the same local server. SSE reconnects replay events and
+status polling provides a fallback. Closing the tab does not cancel work.
+Quota, budget, cancellation, timeout, and interrupted states are displayed explicitly.
+Missing token usage is labeled incomplete with the reserved amount shown.
+
+Choose **Explore free demo**, or open http://127.0.0.1:5173/?investigation=demo,
+to view synthetic N+1 findings without any API calls. Demo paths and commit IDs are
+illustrative and deliberately have no external source links. Source and report
+text is rendered as escaped React text; credentials remain on the server.
 
 `npm run build` creates each application's `dist/`. Run the compiled backend with
 `npm start -w @reposleuth/api`. Production UI hosting and Docker integration are
