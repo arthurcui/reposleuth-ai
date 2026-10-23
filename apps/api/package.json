@@ -1,6 +1,22 @@
 {
-  "name": "@reposleuth/api", "version": "0.1.0", "private": true, "type": "module",
-  "scripts": { "dev": "tsx watch src/server.ts", "build": "tsup src/server.ts --format esm --platform node --target node22 --clean", "start": "node dist/server.js" },
-  "dependencies": { "@reposleuth/shared": "*", "dotenv": "^16.6.1", "fastify": "^5.6.1" },
-  "devDependencies": { "tsx": "^4.20.6", "tsup": "^8.5.0" }
+  "name": "@reposleuth/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsup src/server.ts --format esm --platform node --target node22 --clean",
+    "start": "node dist/server.js",
+    "inspect": "tsx src/github/inspect.ts"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "@reposleuth/shared": "*",
+    "dotenv": "^16.6.1",
+    "fastify": "^5.6.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.6"
+  }
 }
