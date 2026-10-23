@@ -43,6 +43,15 @@ Acceptance:
 
 ## Stage 3 — Agent engine and durable API
 
+Status: implemented; successful live verification is blocked by exhausted API credit.
+The real Agents SDK loop passes deterministic fake-model tests, with citation
+validation, SQLite state and events, SSE replay, cancellation, restart recovery,
+request/token/tool/deadline limits, and persistent cost reservations. Type checks,
+lint, tests, and production builds pass. The bounded live fixture test reached
+OpenAI but returned HTTP 429 with `credit_balance_exhausted` / `insufficient_quota`.
+No live report or billed-token measurement was obtained. Rerun the opt-in smoke
+test after API credits are available before marking this acceptance check complete.
+
 Use the OpenAI Agents SDK with six Zod-validated tools: get_issue, list_files,
 search_code, read_file, get_commits, and get_file_diff. Add bounded turns, total
 tool calls, input/output tokens, timeouts, cancellation, and a conservative cost

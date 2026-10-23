@@ -7,13 +7,17 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsup src/server.ts --format esm --platform node --target node22 --clean",
     "start": "node dist/server.js",
-    "inspect": "tsx src/github/inspect.ts"
+    "inspect": "tsx src/github/inspect.ts",
+    "smoke:agent": "tsx src/agents/smoke.ts"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
+    "@openai/agents": "^0.21.0",
     "@reposleuth/shared": "*",
     "dotenv": "^16.6.1",
-    "fastify": "^5.6.1"
+    "fastify": "^5.6.1",
+    "openai": "^7.43.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
