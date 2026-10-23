@@ -3,10 +3,10 @@
 Autonomous GitHub Issue & Code Investigator. Local, read-only investigation of
 public repositories with source evidence and actionable engineering reports.
 
-**Current checkpoint: Stage 2 — read-only GitHub integration.** The app provides a
-local health check and UI shell; the backend repository provider and inspection CLI
-can retrieve public GitHub evidence. The UI is not connected to this provider yet,
-and AI investigations arrive in Stage 3.
+**Current checkpoint: Stage 3 — agent engine and durable API.** The backend runs a
+bounded investigation agent with six read-only GitHub tools, validates citations,
+and persists reports, usage, and progress in SQLite. The frontend remains the
+foundation shell; investigation controls and reports arrive in Stage 4.
 See [the staged implementation plan](IMPLEMENTATION_PLAN.md) for acceptance checks.
 
 ## Requirements
@@ -106,7 +106,101 @@ history, and diffs on `octocat/Hello-World` at commit
 
 ## Cost and safety
 
-Stage 1 performs no model calls. Later stages will enforce bounded investigations,
-keep credentials server-side, pin evidence to commit SHAs, and expose usage. The
-agent will not execute shell commands, modify repository files, or create PRs.
-Confidence in a hypothesis will not imply a tested or confirmed root cause.
+The agent never executes shell commands, modifies repository files, or creates PRs.
+Evidence validation checks the SHA, path, inclusive line range, exact quote, and
+finding references against source actually read in that run. This verifies citation
+integrity, not the correctness of a root-cause hypothesis. Confidence is qualitative.
+Tests are proposed, never executed by the agent. Repository content remains untrusted.
+
+## Run an investigation (Stage 3)
+
+Save `OPENAI_API_KEY` in root `.env.local`, then run `npm run dev`. The backend
+loads the key server-side only. Starting the server or checking health costs nothing;
+submitting an investigation makes paid API requests. Without a key, POST returns 503.
+
+PowerShell example using a small public repository:
+
+```powershell
+$body = @{
+  repository = 'octocat/Hello-World'
+  question = 'Inspect the repository and explain whether there is enough source code to investigate a defect. Do not invent a defect.'
+} | ConvertTo-Json
+$run = Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3001/api/investigations' -ContentType 'application/json' -Body $body
+Invoke-RestMethod "http://127.0.0.1:3001/api/investigations/$($run.id)"
+```
+
+For an issue investigation, add `issueNumber` with a real issue number in that public
+repository. `owner/repo` and `42` in architectural examples are placeholders.
+
+| Endpoint | Behavior |
+| --- | --- |
+| POST `/api/investigations` | Validate input and return 202 with queued run ID |
+| GET `/api/investigations/:id` | Status, report, revision, duration, token usage, estimated cost |
+| GET `/api/investigations/:id/events` | SSE progress; reconnect with Last-Event-ID or `?after=ID` |
+| POST `/api/investigations/:id/cancel` | Cancel queued/running work |
+| GET `/api/health` | Service health; does not verify API access or balance |
+
+SSE emits queued, started, revision, tool_started, tool_finished, usage, validating,
+and terminal events. These contain tool names/outcomes, not raw tool inputs, source,
+model reasoning, or upstream errors. Disconnecting SSE does not cancel a run. Streams
+close on terminal state; slow consumers reconnect using their last received event ID.
+
+One investigation runs at a time, with at most five queued/running runs. Terminal
+states are completed, failed, budget_exceeded, cancelled, timed_out, and interrupted.
+On restart, unfinished runs become interrupted rather than silently rerunning paid work.
+Data lives in ignored `data/investigations.sqlite`. Run only one backend process per
+database. Local API access is unauthenticated: use only on a trusted machine. The
+server binds loopback and rejects nonlocal Host and unapproved browser Origin headers.
+
+### Budgets and model
+
+The default model is `gpt-6-luna` with low reasoning effort, standard processing,
+remote tracing disabled, response storage disabled, and automatic model retries disabled.
+Public source excerpts and the investigation question are sent to OpenAI for inference.
+The model is fixed in code so changing it requires reviewing its pricing and behavior.
+
+Per run: 12 model requests, 24 tool calls, 100,000 total reported tokens, 2,000 output
+tokens per request, 80,000 estimated input tokens per request, a 120-second deadline,
+and a US$0.05 estimated cost ceiling. A timed-out model request may still have incurred
+charges. In-flight GitHub requests may finish after cancellation, but no further model
+request or report publication is allowed for that run.
+
+Before each call, the app estimates input tokens conservatively from serialized UTF-8
+bytes plus overhead and reserves that cost plus the maximum output allowance. This is
+an application safeguard, not an exact tokenizer or billing guarantee. Reported token
+usage is accumulated after responses; missing usage leaves `usageIncomplete: true`
+and a nonzero `reservedCostUsd`. `estimatedCostUsd` uses recorded token counts at
+conservative rates and is not an invoice amount.
+
+Rates checked 2026-10-22: standard input US$0.10, cache writes US$0.125, output US$0.50
+per million tokens. Budget calculations price all input at US$0.125 to allow for cache
+writes. See [official model pricing](https://developers.openai.com/api/docs/models/gpt-6-luna).
+
+`APP_BUDGET_USD` defaults to US$1 and supports values above zero up to US$5. The SQLite
+ledger reserves cost atomically and never refunds reservations, even on success. It
+therefore stops conservatively, persists across restarts, and is separate from your
+OpenAI account balance. Deleting the database removes this safeguard's history. Keep
+auto-reload disabled in your billing settings if you do not want automatic purchases.
+
+### Verification
+
+`npm run check` uses a deterministic fake model through the real Agents SDK loop and
+makes no paid calls. It covers citation rejection, usage aggregation, budget failures,
+cancellation, timeout, restart recovery, SSE replay, and local API access checks.
+
+An explicit opt-in live smoke test uses synthetic source and the real model:
+
+```sh
+npm run smoke:agent -w @reposleuth/api -- --live
+```
+
+This test has a US$0.02 estimated per-run ceiling and a separate persistent US$0.05
+reservation ledger in `data/live-smoke.sqlite`. It prints only run status and usage;
+inspect the database for the persisted report. It does not access or modify GitHub.
+
+Current live verification: the API was reached, but returned HTTP 429 with
+`credit_balance_exhausted` / `insufficient_quota`. Successful live report generation
+remains unverified. The app now classifies this as `OPENAI_QUOTA`, distinct from
+`OPENAI_RATE_LIMIT`. Add credits through your API billing settings and rerun the
+explicit smoke command when ready. Failed attempts retain a conservative reservation;
+zero reported tokens does not imply a verified zero invoice charge.

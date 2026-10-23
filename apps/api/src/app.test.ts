@@ -10,8 +10,8 @@ describe('local API foundation', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'ok', service: 'reposleuth-api', stage: 'foundation' });
   });
-  it('does not expose investigation or write endpoints yet', async () => {
+  it('rejects malformed investigation requests', async () => {
     const response = await app.inject({ method: 'POST', url: '/api/investigations', payload: {} });
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(400);
   });
 });
