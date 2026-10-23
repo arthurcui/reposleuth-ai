@@ -66,6 +66,20 @@ export class InvestigationService {
         if (controller.signal.aborted) throw new StopError('CANCELLED');
         record.commitSha = repository.revision.commitSha; save();
         emit('revision', { commitSha: record.commitSha });
+        // Validate an explicitly requested issue before reserving money or calling the model.
+        if (record.request.issueNumber !== undefined) {
+          emit('tool_started', { name: 'get_issue', phase: 'preflight' });
+          try {
+            await repository.getIssue(record.request.issueNumber);
+            emit('tool_finished', { name: 'get_issue', phase: 'preflight', outcome: 'success' });
+          } catch (error) {
+            const code = error instanceof RepositoryError ? error.code : 'TOOL_FAILED';
+            emit('tool_finished', { name: 'get_issue', phase: 'preflight', outcome: 'error', code });
+            if (code === 'NOT_FOUND') throw new RepositoryError('ISSUE_NOT_FOUND', 'The requested issue was not found or is inaccessible.');
+            throw error;
+          }
+          if (controller.signal.aborted || this.closed) throw new StopError('CANCELLED');
+        }
         return investigate({ repository, request: record.request, model: this.model(), limits: this.limits,
           usage: record.usage, signal: controller.signal,
           reserve: usd => { if (controller.signal.aborted || this.closed) throw new StopError('CANCELLED'); this.store.reserve(usd, this.lifetimeBudgetUsd); },
