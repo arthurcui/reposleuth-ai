@@ -3,8 +3,10 @@
 Autonomous GitHub Issue & Code Investigator. Local, read-only investigation of
 public repositories with source evidence and actionable engineering reports.
 
-**Current checkpoint: Stage 1 — foundation.** The app provides a local health check
-and a UI shell. It does not yet retrieve repositories or run AI investigations.
+**Current checkpoint: Stage 2 — read-only GitHub integration.** The app provides a
+local health check and UI shell; the backend repository provider and inspection CLI
+can retrieve public GitHub evidence. The UI is not connected to this provider yet,
+and AI investigations arrive in Stage 3.
 See [the staged implementation plan](IMPLEMENTATION_PLAN.md) for acceptance checks.
 
 ## Requirements
@@ -51,6 +53,56 @@ apps/api/          Fastify backend and integration tests
 apps/web/          React/Vite frontend
 packages/shared/  Shared runtime schemas and TypeScript types
 ```
+
+## Inspect a public repository (Stage 2)
+
+```sh
+npm run inspect -w @reposleuth/api -- octocat/Hello-World
+npm run inspect -w @reposleuth/api -- owner/repo 42
+```
+
+The second form retrieves issue 42 and its first 20 comments. A pull request number
+is rejected. A GitHub HTTPS repository URL is also accepted. Public repositories
+work without a token, subject to GitHub's unauthenticated rate limit. Optional
+`GITHUB_TOKEN` belongs only in root `.env.local`; use read-only contents/issues
+permissions. This CLI never uses the OpenAI key.
+
+The `RepositoryProvider` interface exposes `getIssue`, `listFiles`, `searchCode`,
+`readFile`, `getCommits`, and `getFileDiff`. Instantiate `OctokitProvider.connect`
+once per investigation. It resolves the default branch once, pins the commit and
+tree SHAs, and reads blobs from that tree. History is anchored to the same commit.
+Diffs accept only commits returned by `getCommits` for the requested path. The
+provider makes GET requests only and never clones or executes repository code.
+
+Issues/comments are live metadata with a retrieval timestamp, not historical
+content pinned to a source commit. Diffs are historical context; use `readFile`
+for exact source evidence. Line numbers are one-based. Reads clamp the end at EOF
+and reject a start beyond EOF, including empty files.
+
+Limits per provider instance:
+
+| Resource | Limit |
+| --- | --- |
+| Eligible tree entries / returned paths | 5,000 / 500 |
+| Individual source file | 128 KiB, UTF-8 only |
+| Search index | First 40 eligible paths in sorted order, at most 2 MiB |
+| Search | Literal, case-sensitive, 2–200 characters; 30 matching lines |
+| Source read | 200 lines and 24,000 characters |
+| Issue comments / field text | 20 / 8,000 characters |
+| File history / diff pagination | 10 commits / 300 changed files |
+| Network | 2 setup requests + up to 55 operation requests; 15-second request timeout |
+
+Search indexes are in memory and cached per instance. Binary files, symlinks,
+submodules, dependency/build directories, env files, lockfiles, and common binary
+extensions are excluded. Truncation and exclusions are returned as explicit warnings;
+an empty search is not proof a symbol is absent from the repository. GitHub-truncated
+trees are not expanded with unbounded follow-up requests. API failures use sanitized
+error codes, including rate-limit/access denial and exhausted request budget.
+
+Stage 2 uses mocked HTTP fixtures for all six operations and error/boundary cases.
+A live unauthenticated smoke check also exercised discovery, reading, search,
+history, and diffs on `octocat/Hello-World` at commit
+`7fd1a60b01f91b314f59955a4e4d4e80d8edf11d`. Live checks are not part of `npm test`.
 
 ## Cost and safety
 

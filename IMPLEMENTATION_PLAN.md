@@ -22,6 +22,13 @@ Acceptance:
 
 ## Stage 2 — Read-only GitHub integration
 
+Status: implemented. The Octokit adapter and inspection CLI provide all six
+read-only operations. Fixture-backed tests cover pinning, input validation,
+private-repository rejection, content/output limits, partial search, errors, and
+bounded pagination. A live unauthenticated public-repository smoke check passed
+for discovery, source reading, search, history, and diffs. Issue retrieval is
+verified by deterministic fixtures. UI integration remains in Stage 4.
+
 Implement a RepositoryProvider interface and an Octokit adapter. Validate GitHub
 repository URLs and owner/repo input. Reject private repositories. Resolve a commit
 SHA once per investigation and pin source retrieval to it. Read issues and bounded
