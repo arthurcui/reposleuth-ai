@@ -1,0 +1,8 @@
+# Explicit opt-in: pass credentials from the host environment, never the build context.
+services:
+  reposleuth:
+    environment:
+      DEMO_ONLY: "0"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in the calling environment}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      APP_BUDGET_USD: ${APP_BUDGET_USD:-1}

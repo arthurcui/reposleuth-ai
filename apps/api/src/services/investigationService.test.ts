@@ -28,6 +28,30 @@ async function finish(service: InvestigationService, id: string) {
 }
 
 describe('investigation lifecycle and API', () => {
+  it('does not call the model after a timed-out issue preflight eventually resolves', async () => {
+    const repository = fakeRepository();
+    const original = repository.getIssue;
+    let release!: () => void;
+    repository.getIssue = async number => { await new Promise<void>(resolve => { release = resolve; }); return original(number); };
+    const model = vi.fn(() => new ScriptedModel());
+    const service = new InvestigationService(new InvestigationStore(':memory:'), async () => repository, model, { timeoutMs: 30 }); resources.push(service);
+    const id = service.start(request).id;
+    expect(await finish(service, id)).toMatchObject({ status: 'timed_out', usage: { requests: 0 } });
+    const events = service.store.events(id).length;
+    release(); await new Promise(resolve => setTimeout(resolve, 20));
+    expect(model).not.toHaveBeenCalled();
+    expect(service.store.events(id)).toHaveLength(events);
+    expect(service.store.get(id)?.status).toBe('timed_out');
+  });
+  it('fails rate-limited model calls once and retains the conservative reservation', async () => {
+    const getResponse = vi.fn(async () => { throw { status: 429, code: 'rate_limit_exceeded' }; });
+    const service = make(() => ({ getResponse, getStreamedResponse: () => { throw new Error('unused'); } }));
+    const run = await finish(service, service.start(request).id);
+    expect(run).toMatchObject({ status: 'failed', errorCode: 'OPENAI_RATE_LIMIT', usage: { requests: 1, usageIncomplete: true } });
+    expect(getResponse).toHaveBeenCalledTimes(1);
+    expect(run.usage.reservedCostUsd).toBeGreaterThan(0);
+    expect(run.report).toBeNull();
+  });
   it.each(['NOT_FOUND', 'RATE_LIMITED'])('checks the issue before using the model: %s', async code => {
     const repository = fakeRepository();
     repository.getIssue = vi.fn().mockRejectedValue(new RepositoryError(code, 'Upstream details'));

@@ -40,6 +40,13 @@ describe('repository selection', () => {
 });
 
 describe('read-only provider', () => {
+  it('does not automatically retry rate-limited GitHub operations', async () => {
+    const f = fixture(url => url.pathname.endsWith('/issues/42') ? { status: 429, data: { message: 'rate limited' }, headers: { 'retry-after': '60' } } : undefined);
+    const provider = await f.connect();
+    await expect(provider.getIssue(42)).rejects.toMatchObject({ code: 'RATE_LIMIT_OR_FORBIDDEN' });
+    expect(f.calls.filter(url => url.pathname.endsWith('/issues/42'))).toHaveLength(1);
+    expect(f.methods.every(method => method === 'GET')).toBe(true);
+  });
   it('runs all six operations with exact evidence and pinned GET requests', async () => {
     const f = fixture();
     const provider = await f.connect();

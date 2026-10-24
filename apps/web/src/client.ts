@@ -15,7 +15,7 @@ export function errorMessage(code: string): string {
   const messages: Record<string, string> = {
     AGENT_NOT_CONFIGURED: 'Configure OPENAI_API_KEY on the local API server, then restart it.',
     OPENAI_QUOTA: 'OpenAI API credits are exhausted. Add credits or explore the free demo.',
-    OPENAI_AUTH: 'The server’s OpenAI API key was rejected. Check its local configuration.',
+    OPENAI_AUTHENTICATION: 'The server’s OpenAI API key was rejected. Check its local configuration.',
     OPENAI_ACCESS: 'The configured OpenAI model is unavailable to this project.',
     OPENAI_RATE_LIMIT: 'OpenAI rate-limited this run. Try again later.',
     PROCESS_RESTARTED: 'The API restarted during this investigation. Start a new run to continue.',

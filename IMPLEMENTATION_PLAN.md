@@ -99,6 +99,31 @@ Acceptance:
 
 ## Stage 5 — Reliability, evaluation, and demo
 
+Status: implementation complete; real-model acceptance targets remain pending.
+Added 20 distinct synthetic cases across all six defect families, SDK/service
+replay evaluation, per-case reports and timing, negative citation tests, and a
+human-review grader that rejects replay as accuracy evidence. Live evaluation is
+explicitly opt-in, separately budgeted, and was not run due to the prior credit
+shortage. Rate-limit/no-retry, late preflight completion, and production hosting
+tests are included. Type checks, lint, tests, and builds pass locally and in the
+Linux Docker build. The Docker container became healthy and its credential-free
+deployment smoke passed. Compose publishes only loopback:5174 and retains a data
+volume. GitHub Actions configuration is added; remote CI awaits publication.
+
+Measured scripted replay: 20/20 completion, all 20 reports citation-valid, zero
+forbidden tool calls, 194 ms total / 12 ms p95 locally, $0 external API cost.
+These are pipeline checks with scripted answers, not model accuracy or latency.
+Live 95% completion, 80% root-cause accuracy, and <90-second targets are not claimed.
+See `docs/evaluation.md` for independent review and `docs/architecture.md` for
+data flow, deployment, and operating boundaries.
+
+The browser demo now uses the shared 20-case corpus with a grouped selector and
+URL-based selection recovery. The two demo banners identify the reports as
+illustrative. Demo commits, duration, token counts, and cost are fictional
+presentation values, not measured model usage. Cases have distinct risks,
+questions, uncertainties, and proposed code with explanations. Several cases
+include two or three exact source excerpts with numbered evidence links.
+
 Add deterministic bug fixtures (N+1, stale state, missing await, cache invalidation,
 races, pagination), integration tests, rate-limit/retry coverage, Docker, and CI.
 Prepare at least 20 curated cases with expected root causes and supporting files.

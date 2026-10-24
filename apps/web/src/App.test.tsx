@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App } from './App';
 import { demo } from './demo';
+import { demoCases } from './demo';
 import { Report } from './Report';
 import { sourceUrl } from './client';
 
@@ -17,14 +18,70 @@ class Stream extends EventTarget {
 beforeEach(() => { history.replaceState(null, '', '/'); vi.stubGlobal('EventSource', Stream); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe('investigation UI', () => {
+  it('visibly selects demo mode, disables live inputs, and restores the draft on exit', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch); render(<App />);
+    const repository = screen.getByLabelText('Public GitHub repository') as HTMLInputElement;
+    fireEvent.change(repository, { target: { value: 'owner/draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Show demo investigation' }));
+    expect(await screen.findByText('DEMO MODE')).toBeTruthy();
+    expect(screen.queryByText(/aaaaaaaaaaaa/)).toBeNull();
+    expect(screen.queryByText('Synthetic example · no GitHub commit')).toBeNull();
+    expect(screen.queryByText('LOCAL · READ ONLY')).toBeNull();
+    expect(screen.queryByText('Curated example · no investigation was run')).toBeNull();
+    expect(screen.getByText(/Issue #42/)).toBeTruthy();
+    expect(repository.disabled).toBe(true);
+    expect((screen.getByLabelText(/Issue number/) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('What should we investigate?') as HTMLTextAreaElement).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: '✓ Showing demo investigation' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('button', { name: 'Investigate →' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Start a real investigation →' }));
+    expect(repository.disabled).toBe(false);
+    expect(repository.value).toBe('owner/draft');
+    expect(location.search).toBe('');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('browses all 20 cases without API calls and restores selection from the URL', async () => {
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    history.replaceState(null, '', '/?investigation=demo');
+    const view = render(<App />);
+    expect(screen.getAllByRole('option')).toHaveLength(20);
+    expect((screen.getByRole('button', { name: 'Previous demo case' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Next demo case' }));
+    expect((screen.getByLabelText('Explore the 20 defect cases') as HTMLSelectElement).value).toBe('n1-authors');
+    expect(await screen.findByText('N+1: n1-authors')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Previous demo case' }));
+    expect((screen.getByLabelText('Explore the 20 defect cases') as HTMLSelectElement).value).toBe('n1-orders');
+    expect(screen.getByRole('link', { name: 'View evidence #1 ↓' }).getAttribute('href')).toBe('#evidence-E1');
+    expect((screen.getByRole('button', { name: 'Previous report case' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Next report case' }));
+    expect(await screen.findByText('N+1: n1-authors')).toBeTruthy();
+    expect((screen.getByLabelText('Explore the 20 defect cases') as HTMLSelectElement).value).toBe('n1-authors');
+    fireEvent.click(screen.getByRole('button', { name: 'Previous report case' }));
+    expect(await screen.findByText('N+1: n1-orders')).toBeTruthy();
+    for (const test of demoCases) {
+      fireEvent.change(screen.getByLabelText('Explore the 20 defect cases'), { target: { value: test.id } });
+      expect(await screen.findByText(`${test.category}: ${test.id}`)).toBeTruthy();
+      expect(screen.getByText(test.fix)).toBeTruthy();
+      expect(screen.getByText(test.verification)).toBeTruthy();
+    }
+    expect(location.search).toContain('case=page-order');
+    expect((screen.getByRole('button', { name: 'Next demo case' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Next report case' }) as HTMLButtonElement).disabled).toBe(true);
+    view.unmount(); render(<App />);
+    expect(await screen.findByText('pagination: page-order')).toBeTruthy();
+    act(() => { history.replaceState(null, '', '/?investigation=demo&case=cache-key'); window.dispatchEvent(new PopStateEvent('popstate')); });
+    expect(await screen.findByText('cache-invalidation: cache-key')).toBeTruthy();
+    expect(screen.queryByText('Open on GitHub ↗')).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('opens the clearly labeled demo without network requests and restores it from the URL', async () => {
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
-    const view = render(<App />); fireEvent.click(screen.getByText('Explore free demo'));
-    expect(await screen.findByText('Possible N+1 database reads')).toBeTruthy();
+    const view = render(<App />); fireEvent.click(screen.getByText('Show demo investigation'));
+    expect(await screen.findByText('N+1: n1-orders')).toBeTruthy();
     expect(screen.getByText(/synthetic code and findings/)).toBeTruthy();
     expect(fetch).not.toHaveBeenCalled();
     view.unmount(); render(<App />);
-    expect(await screen.findByText('Possible N+1 database reads')).toBeTruthy();
+    expect(await screen.findByText('N+1: n1-orders')).toBeTruthy();
   });
   it('submits the form, shows live events once, and cancels a run', async () => {
     const fetch = vi.fn(async (_url: string, init?: RequestInit) => ({ ok: true, json: async () => init?.method === 'POST' ? { id: 'run-1', cancelled: true } : { ...demo, id: 'run-1', status: 'running', report: null } }));
