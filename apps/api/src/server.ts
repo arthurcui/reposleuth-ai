@@ -14,18 +14,21 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 }
 const appBudget = Number(process.env.APP_BUDGET_USD ?? 1);
 if (!Number.isFinite(appBudget) || appBudget <= 0 || appBudget > 5) throw new Error('APP_BUDGET_USD must be greater than zero and at most 5');
-const apiKey = process.env.OPENAI_API_KEY;
+const apiKey = process.env.DEMO_ONLY === '1' ? undefined : process.env.OPENAI_API_KEY;
 const service = apiKey ? new InvestigationService(
   new InvestigationStore(fileURLToPath(new URL('../../../data/investigations.sqlite', import.meta.url))),
   repository => OctokitProvider.connect(repository, { token: process.env.GITHUB_TOKEN }),
   () => liveModel(apiKey), {}, appBudget,
 ) : undefined;
-const app = buildApp(service);
+const app = buildApp(service, process.env.SERVE_WEB === '1'
+  ? { webRoot: fileURLToPath(new URL('../../web/dist/', import.meta.url)) } : {});
+// Container ingress requires a wildcard bind inside the container. Compose publishes loopback only.
+const host = process.env.CONTAINER_MODE === '1' ? '0.0.0.0' : '127.0.0.1';
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => { void app.close(); });
 }
 try {
-  await app.listen({ port, host: '127.0.0.1' });
+  await app.listen({ port, host });
   console.log(`RepoSleuth API listening at http://127.0.0.1:${port}`);
 } catch {
   console.error('Could not start the API. Check PORT and whether it is already in use.');

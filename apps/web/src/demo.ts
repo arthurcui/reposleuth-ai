@@ -1,4 +1,38 @@
 import type { Investigation, InvestigationEvent } from '@reposleuth/shared';
+import { cases } from '@reposleuth/shared/eval-cases';
+import { demoDetails } from './demoDetails';
+
+export const demoCases = cases;
+// Stable fictional commit IDs for presentation, not hashes of a Git repository.
+function fixtureCommit(id: string) {
+  return Array.from({ length: 5 }, (_, block) => {
+    let hash = 2166136261 ^ block;
+    for (const char of id) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  }).join('');
+}
+export function demoForCase(id: string): Investigation {
+  const test = cases.find(item => item.id === id) ?? cases[0]!;
+  const details = demoDetails[test.id]!;
+  const index = cases.indexOf(test);
+  const durationMs = 18400 + index * 1373;
+  const inputTokens = 3200 + index * 247;
+  const outputTokens = 600 + index * 43;
+  const commitSha = fixtureCommit(test.id);
+  const lines = test.source.split('\n');
+  const evidence = (details.ranges ?? [[1, lines.length]]).map(([startLine, endLine], index) => ({
+    id: `E${index + 1}`, path: test.path, commitSha, startLine: startLine!, endLine: endLine!, quote: lines.slice(startLine! - 1, endLine).join('\n'),
+  }));
+  return { ...demo, durationMs, commitSha, model: 'gpt-6-luna', finishedAt: new Date(Date.parse(demo.startedAt!) + durationMs).toISOString(),
+    usage: { requests: 3 + index % 5, inputTokens, outputTokens, estimatedCostUsd: inputTokens * 0.125 / 1_000_000 + outputTokens * 0.5 / 1_000_000, reservedCostUsd: 0, usageIncomplete: false },
+    request: { repository: `example/${test.id}`, issueNumber: 42, question: test.question },
+    report: {
+      summary: test.rootCause,
+      findings: [{ title: `${test.category}: ${test.id}`, explanation: test.rootCause, kind: 'hypothesis', confidence: 'medium', uncertainty: details.uncertainty, evidenceIds: evidence.map(item => item.id) }],
+      evidence,
+      recommendations: [test.fix], testPlan: [test.verification], risks: [details.risk], unresolvedQuestions: [details.question],
+    } };
+}
 
 const sha = 'a'.repeat(40);
 export const demo: Investigation = {

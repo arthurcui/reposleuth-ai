@@ -8,9 +8,12 @@
     "build": "tsup src/server.ts --format esm --platform node --target node22 --clean",
     "start": "node dist/server.js",
     "inspect": "tsx src/github/inspect.ts",
-    "smoke:agent": "tsx src/agents/smoke.ts"
+    "smoke:agent": "tsx src/agents/smoke.ts",
+    "eval": "tsx src/evals/runner.ts",
+    "eval:review": "tsx src/evals/review.ts"
   },
   "dependencies": {
+    "@fastify/static": "^10.1.7",
     "@octokit/rest": "^22.0.1",
     "@openai/agents": "^0.21.0",
     "@reposleuth/shared": "*",

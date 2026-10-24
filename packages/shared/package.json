@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/schemas.ts"
+    ".": "./src/schemas.ts",
+    "./eval-cases": "./src/evalCases.ts"
   },
   "dependencies": {
     "zod": "^4.6.7"

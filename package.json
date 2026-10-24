@@ -16,7 +16,9 @@
     "typecheck": "tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "eval": "npm run eval -w @reposleuth/api --",
+    "smoke:deployment": "node scripts/smoke-deployment.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

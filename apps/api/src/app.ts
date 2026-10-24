@@ -1,9 +1,10 @@
 import Fastify from 'fastify';
+import fastifyStatic from '@fastify/static';
 import { healthSchema } from '@reposleuth/shared';
 import { registerInvestigations } from './routes/investigations.js';
 import type { InvestigationService } from './services/investigationService.js';
 
-export function buildApp(service?: InvestigationService) {
+export function buildApp(service?: InvestigationService, options: { webRoot?: string } = {}) {
   const app = Fastify({ logger: false, bodyLimit: 16384 });
   app.addHook('onRequest', async (req, reply) => {
     // Loopback-only API: reject DNS rebinding and browser cross-origin requests.
@@ -18,6 +19,9 @@ export function buildApp(service?: InvestigationService) {
     reply.header('Cache-Control', 'no-store');
   });
   registerInvestigations(app, service);
+  if (options.webRoot) {
+    void app.register(fastifyStatic, { root: options.webRoot, dotfiles: 'deny', index: ['index.html'] });
+  }
   app.get('/api/health', async () => healthSchema.parse({
     status: 'ok', service: 'reposleuth-api', stage: 'foundation',
   }));

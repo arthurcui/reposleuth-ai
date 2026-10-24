@@ -3,19 +3,17 @@
 Autonomous GitHub Issue & Code Investigator. Local, read-only investigation of
 public repositories with source evidence and actionable engineering reports.
 
-**Current checkpoint: Stage 4 — investigation user experience.** Submit a public
-GitHub repository and question, follow live tool activity, and inspect reports with
-line-numbered evidence, confidence, uncertainty, and proposed fixes. The backend
-persists reports, usage, and progress in SQLite. A clearly labeled synthetic demo
-works without credentials or paid requests. Successful live model verification
-still awaits API credits (see verification below).
-See [the staged implementation plan](IMPLEMENTATION_PLAN.md) for acceptance checks.
+Includes the
+investigation workspace, durable API, 20-case evaluation corpus, credential-free
+regression suite, Docker demo, and GitHub Actions checks. Real-model accuracy and
+latency targets remain unverified pending API credits and independent review.
+See [the implementation plan](IMPLEMENTATION_PLAN.md) for development history and acceptance checks.
 
 ## Requirements
 
 - Node.js 22.13+, 24.x, or 26+ and npm (Node 24 LTS recommended).
 - Network access to npm for installing dependencies.
-- No GitHub or OpenAI credentials required for Stage 1.
+- No GitHub or OpenAI credentials required for tests, replay evaluation, or the demo.
 
 ## Run locally
 
@@ -44,7 +42,7 @@ npm run check
 This runs TypeScript checks, ESLint, Vitest API and React interaction tests, and
 production builds. Tests need no external APIs or paid calls.
 
-## Investigation workspace (Stage 4)
+## Investigation workspace
 
 1. Open http://127.0.0.1:5173 and enter a public GitHub URL or `owner/repository`.
 2. Optionally enter an issue number, then describe what to investigate.
@@ -60,14 +58,73 @@ status polling provides a fallback. Closing the tab does not cancel work.
 Quota, budget, cancellation, timeout, and interrupted states are displayed explicitly.
 Missing token usage is labeled incomplete with the reserved amount shown.
 
-Choose **Explore free demo**, or open http://127.0.0.1:5173/?investigation=demo,
-to view synthetic N+1 findings without any API calls. Demo paths and commit IDs are
+Choose **Show demo investigation**, or open http://127.0.0.1:5173/?investigation=demo,
+to browse all 20 synthetic cases using the **Explore the 20 defect cases** selector.
+Use the left/right arrow buttons beside the dropdown to move between cases.
+The URL preserves the selected case on refresh. Each case shows source, expected
+cause, proposed fix, and verification without API calls. Demo paths and commit IDs are
 illustrative and deliberately have no external source links. Source and report
 text is rendered as escaped React text; credentials remain on the server.
 
+Demo duration, token counts, requests, and estimated costs are fictional fixture
+values, not actual API usage. Cases include distinct risks and open questions,
+proposed code with explanations, and numbered source evidence. Some cases cite
+multiple excerpts. The demo banners remain visible to distinguish these examples
+from live reports.
+
+Demo mode highlights the selected button and disables the live form. Choose
+**Start a real investigation** to leave the demo and restore your editable draft.
+
 `npm run build` creates each application's `dist/`. Run the compiled backend with
 `npm start -w @reposleuth/api`. Production UI hosting and Docker integration are
-planned for Stage 5; use `npm run dev` for the integrated UI/API checkpoint.
+available below; use `npm run dev` for development.
+
+## Docker demo (no credentials or paid calls)
+
+With Docker Desktop running:
+
+```sh
+docker compose up --build -d --wait
+npm run smoke:deployment
+```
+
+Open http://127.0.0.1:5174/?investigation=demo. The image runs types, lint, the test suite,
+production builds, and all 20 scripted evaluation cases during its build. Fastify
+serves the built UI and API together. The default image sets `DEMO_ONLY=1`, so live
+investigations are disabled even if a key is accidentally supplied. Environment
+files are excluded from the image. SQLite storage uses a named volume; the image
+runs as a non-root user with a read-only filesystem. Stop with `docker compose down`;
+the volume is retained. Do not use `down -v` unless you intend to delete stored runs
+and budget history.
+
+To explicitly enable paid investigations, supply `OPENAI_API_KEY` in your shell
+environment and run:
+
+```sh
+docker compose -f compose.yaml -f compose.live.yaml up -d --wait
+```
+
+Optional `GITHUB_TOKEN` and `APP_BUDGET_USD` are passed at runtime by this override.
+Do not paste credentials into commands, source, or the Dockerfile. The container's
+ledger is separate from the local development database. Ports are published only
+on loopback; keep this local application off public interfaces.
+
+## Evaluation and CI
+
+```sh
+npm run eval
+```
+
+The 20 synthetic cases cover N+1 queries, stale state, missing await, cache
+invalidation, races, and pagination. Replay results are written to
+`data/evals/latest.json`. This exercises the actual SDK loop with scripted answers;
+it does not measure model reasoning accuracy. No API calls are made.
+
+See [evaluation instructions and human grading](docs/evaluation.md) for the opt-in,
+budget-capped live evaluator and accuracy rubric, and [architecture](docs/architecture.md)
+for data flow and operating boundaries. GitHub Actions runs checks, replay, Docker
+build/health, and deployment smoke without secrets on PRs and pushes to `main`.
+The workflow must run on GitHub after publication before remote CI is confirmed.
 
 ## Layout
 
@@ -77,7 +134,7 @@ apps/web/          React/Vite frontend
 packages/shared/  Shared runtime schemas and TypeScript types
 ```
 
-## Inspect a public repository (Stage 2)
+## Inspect a public repository
 
 ```sh
 npm run inspect -w @reposleuth/api -- octocat/Hello-World
@@ -122,7 +179,7 @@ an empty search is not proof a symbol is absent from the repository. GitHub-trun
 trees are not expanded with unbounded follow-up requests. API failures use sanitized
 error codes, including rate-limit/access denial and exhausted request budget.
 
-Stage 2 uses mocked HTTP fixtures for all six operations and error/boundary cases.
+The GitHub integration uses mocked HTTP fixtures for all six operations and error/boundary cases.
 A live unauthenticated smoke check also exercised discovery, reading, search,
 history, and diffs on `octocat/Hello-World` at commit
 `7fd1a60b01f91b314f59955a4e4d4e80d8edf11d`. Live checks are not part of `npm test`.
@@ -135,7 +192,7 @@ finding references against source actually read in that run. This verifies citat
 integrity, not the correctness of a root-cause hypothesis. Confidence is qualitative.
 Tests are proposed, never executed by the agent. Repository content remains untrusted.
 
-## Run an investigation (Stage 3)
+## Run an investigation via the API
 
 Save `OPENAI_API_KEY` in root `.env.local`, then run `npm run dev`. The backend
 loads the key server-side only. Starting the server or checking health costs nothing;
