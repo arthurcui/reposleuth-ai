@@ -41,6 +41,69 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('investigation UI', () => {
+  it('reopens a saved report from history without starting another investigation', async () => {
+    const saved = { ...demo, id: 'saved-run' };
+    const fetch = vi.fn(async (path: string) => ({
+      ok: true,
+      json: async () =>
+        path.includes('?')
+          ? {
+              total: 1,
+              limit: 20,
+              offset: 0,
+              items: [
+                {
+                  id: saved.id,
+                  request: saved.request,
+                  status: saved.status,
+                  createdAt: saved.createdAt,
+                  model: saved.model,
+                  summary: saved.report?.summary,
+                  hasReport: true,
+                },
+              ],
+            }
+          : saved,
+    }));
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Investigation history' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open report' }));
+    await waitFor(() => expect(location.search).toContain('investigation=saved-run'));
+    expect(await screen.findByRole('link', { name: 'Export Markdown' })).toBeTruthy();
+    expect(fetch.mock.calls.every(([path]) => path.startsWith('/api/investigations'))).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect((screen.getByLabelText('Public GitHub repository') as HTMLInputElement).value).toBe(
+      saved.request.repository,
+    );
+    expect((screen.getByLabelText(/Issue number/) as HTMLInputElement).value).toBe(
+      String(saved.request.issueNumber),
+    );
+    expect(
+      (screen.getByLabelText('What should we investigate?') as HTMLTextAreaElement).value,
+    ).toBe(saved.request.question);
+    expect(screen.getByRole('button', { name: 'Run again' })).toBeTruthy();
+  });
+  it('loads a direct report link, clears an absent issue, and preserves edits across events', async () => {
+    history.replaceState(null, '', '/?investigation=run-1');
+    const saved = {
+      ...demo,
+      id: 'run-1',
+      request: { repository: 'owner/saved', question: 'Investigate the saved question' },
+    };
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => saved });
+    vi.stubGlobal('fetch', fetch);
+    render(<App />);
+    await screen.findByRole('button', { name: 'Run again' });
+    expect((screen.getByLabelText(/Issue number/) as HTMLInputElement).value).toBe('');
+    const question = screen.getByLabelText('What should we investigate?') as HTMLTextAreaElement;
+    expect(question.value).toBe(saved.request.question);
+    fireEvent.change(question, { target: { value: 'My revised question' } });
+    await act(async () => {
+      Stream.latest.emit('usage');
+    });
+    expect(question.value).toBe('My revised question');
+  });
   it('visibly selects demo mode, disables live inputs, and restores the draft on exit', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
@@ -65,7 +128,12 @@ describe('investigation UI', () => {
         .getAttribute('aria-pressed'),
     ).toBe('true');
     expect(screen.queryByRole('button', { name: 'Investigate →' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Start a real investigation →' }));
+    const leaveButton = screen.getByRole('button', { name: 'Start a real investigation →' });
+    const leaveClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+    fireEvent(leaveButton, leaveClick);
+    expect(leaveClick.defaultPrevented).toBe(true);
+    expect(leaveButton.isConnected).toBe(false);
+    expect(screen.getByRole('button', { name: 'Investigate →' })).not.toBe(leaveButton);
     expect(repository.disabled).toBe(false);
     expect(repository.value).toBe('owner/draft');
     expect(location.search).toBe('');

@@ -1,17 +1,49 @@
 /** Registers investigation lifecycle, report, source, and event-stream HTTP endpoints. */
 import type { FastifyInstance } from 'fastify';
-import { investigationRequestSchema } from '@reposleuth/shared';
+import { investigationRequestSchema, historyQuerySchema } from '@reposleuth/shared';
+import { exportMarkdown } from '../services/markdownExport.js';
 import { parseRepository } from '../github/repositoryIndex.js';
 import { StopError } from '../agents/budget.js';
 import type { InvestigationService } from '../services/investigationService.js';
+import type { InvestigationStore } from '../storage/sqlite.js';
 
-export function registerInvestigations(app: FastifyInstance, service?: InvestigationService) {
+export function registerInvestigations(
+  app: FastifyInstance,
+  service?: InvestigationService,
+  store: InvestigationStore | undefined = service?.store,
+) {
   const streams = new Set<() => void>();
   app.addHook('preClose', async () => {
     for (const close of streams) close();
   });
   app.addHook('onClose', async () => {
     service?.close();
+    if (!service) store?.close();
+  });
+  app.get('/api/investigations', async (req, reply) => {
+    const query = historyQuerySchema.safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: 'INVALID_HISTORY_QUERY' });
+    if (!store) return reply.code(503).send({ error: 'HISTORY_UNAVAILABLE' });
+    if (query.data.repository) {
+      try {
+        const parsed = parseRepository(query.data.repository);
+        query.data.repository = `${parsed.owner}/${parsed.repo}`;
+      } catch {
+        return reply.code(400).send({ error: 'INVALID_REPOSITORY' });
+      }
+    }
+    return store.list(query.data);
+  });
+  app.get<{ Params: { id: string } }>('/api/investigations/:id/export', async (req, reply) => {
+    const run = store?.get(req.params.id);
+    if (!run) return reply.code(404).send({ error: 'NOT_FOUND' });
+    if (!run.report) return reply.code(409).send({ error: 'REPORT_NOT_AVAILABLE' });
+    const filename = run.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return reply
+      .header('Content-Disposition', `attachment; filename="investigation-${filename}.md"`)
+      .header('Cache-Control', 'no-store')
+      .type('text/markdown; charset=utf-8')
+      .send(exportMarkdown(run));
   });
   app.post('/api/investigations', async (req, reply) => {
     const input = investigationRequestSchema.safeParse(req.body);
@@ -35,7 +67,7 @@ export function registerInvestigations(app: FastifyInstance, service?: Investiga
     }
   });
   app.get<{ Params: { id: string } }>('/api/investigations/:id', async (req, reply) => {
-    const record = service?.store.get(req.params.id);
+    const record = store?.get(req.params.id);
     if (!record) return reply.code(404).send({ error: 'NOT_FOUND' });
     if (record.status === 'running' && record.startedAt)
       record.durationMs = Date.now() - Date.parse(record.startedAt);
@@ -48,7 +80,7 @@ export function registerInvestigations(app: FastifyInstance, service?: Investiga
   app.get<{ Params: { id: string }; Querystring: { after?: string } }>(
     '/api/investigations/:id/events',
     async (req, reply) => {
-      if (!service?.store.get(req.params.id)) return reply.code(404).send({ error: 'NOT_FOUND' });
+      if (!store?.get(req.params.id)) return reply.code(404).send({ error: 'NOT_FOUND' });
       const cursor = req.headers['last-event-id'] ?? req.query.after ?? '0';
       if (
         typeof cursor !== 'string' ||
@@ -77,7 +109,7 @@ export function registerInvestigations(app: FastifyInstance, service?: Investiga
       };
       const pump = () => {
         if (closed) return;
-        for (const event of service.store.events(req.params.id, after)) {
+        for (const event of store.events(req.params.id, after)) {
           after = event.id;
           if (
             !reply.raw.write(
@@ -88,7 +120,7 @@ export function registerInvestigations(app: FastifyInstance, service?: Investiga
             return;
           }
         }
-        const state = service.store.get(req.params.id)?.status;
+        const state = store.get(req.params.id)?.status;
         if (state !== 'queued' && state !== 'running') close();
       };
       const poll = setInterval(pump, 200);

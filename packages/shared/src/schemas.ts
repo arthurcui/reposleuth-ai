@@ -85,3 +85,43 @@ export interface InvestigationEvent {
   type: string;
   data: Record<string, unknown>;
 }
+
+export const investigationStatusSchema = z.enum([
+  'queued',
+  'running',
+  'completed',
+  'failed',
+  'budget_exceeded',
+  'cancelled',
+  'timed_out',
+  'interrupted',
+]);
+export const historyQuerySchema = z
+  .object({
+    q: z.string().trim().max(300).default(''),
+    repository: z.string().trim().max(250).default(''),
+    issueNumber: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+    model: z.string().trim().max(150).default(''),
+    status: investigationStatusSchema.optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).max(1000000).default(0),
+  })
+  .strict();
+export type HistoryQuery = z.infer<typeof historyQuerySchema>;
+export const historyItemSchema = z.object({
+  id: z.string(),
+  request: investigationRequestSchema,
+  status: investigationStatusSchema,
+  createdAt: z.string(),
+  model: z.string(),
+  summary: z.string().nullable(),
+  hasReport: z.boolean(),
+});
+export const historyPageSchema = z.object({
+  models: z.array(z.string()).optional(),
+  items: z.array(historyItemSchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+});
+export type HistoryPage = z.infer<typeof historyPageSchema>;

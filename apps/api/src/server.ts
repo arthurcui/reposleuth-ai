@@ -19,11 +19,12 @@ if (!Number.isFinite(appBudget) || appBudget <= 0 || appBudget > 5)
   throw new Error('APP_BUDGET_USD must be greater than zero and at most 5');
 const provider = providerConfig();
 const apiKey = process.env.DEMO_ONLY === '1' ? undefined : process.env[provider.keyVariable];
+const store = new InvestigationStore(
+  fileURLToPath(new URL('../../../data/investigations.sqlite', import.meta.url)),
+);
 const service = apiKey
   ? new InvestigationService(
-      new InvestigationStore(
-        fileURLToPath(new URL('../../../data/investigations.sqlite', import.meta.url)),
-      ),
+      store,
       (repository) => OctokitProvider.connect(repository, { token: process.env.GITHUB_TOKEN }),
       () => liveModel(apiKey, provider),
       {},
@@ -31,12 +32,12 @@ const service = apiKey
       provider,
     )
   : undefined;
-const app = buildApp(
-  service,
-  process.env.SERVE_WEB === '1'
+const app = buildApp(service, {
+  store,
+  ...(process.env.SERVE_WEB === '1'
     ? { webRoot: fileURLToPath(new URL('../../web/dist/', import.meta.url)) }
-    : {},
-);
+    : {}),
+});
 // Container ingress requires a wildcard bind inside the container. Compose publishes loopback only.
 const host = process.env.CONTAINER_MODE === '1' ? '0.0.0.0' : '127.0.0.1';
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

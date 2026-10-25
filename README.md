@@ -1,7 +1,11 @@
 # RepoSleuth AI
 
-Autonomous GitHub Issue & Code Investigator. Local, read-only investigation of
-public repositories with source evidence and actionable engineering reports.
+AI agent for investigating GitHub issues and code, with evidence-backed engineering reports.
+
+The agent independently selects tools, searches public repositories, reads source
+files, and gathers evidence to explain likely root causes and recommend fixes.
+Investigations are read-only: the agent does not modify code or execute repository
+commands. Run it on your computer, in Docker, or on a cloud server.
 
 Includes the
 investigation workspace, durable API, 20-case evaluation corpus, credential-free
@@ -12,6 +16,32 @@ See [the implementation plan](IMPLEMENTATION_PLAN.md) for development history an
 For real GitHub/model evaluation, see [the three public benchmark projects](docs/public-benchmarks.md):
 Node.js/TypeScript, C#/.NET, and React/TypeScript, with five issue investigations each.
 These are separate from the prewritten demo and scripted replay corpus.
+
+## How it works
+
+```mermaid
+flowchart TD
+    Request["Repository URL + issue or investigation question"] --> API["API: pin repository revision and start investigation"]
+
+    subgraph Investigation["Bounded agent investigation"]
+        Agent["AI agent: OpenAI or Gemini"] -->|Select next tool| Tools["Read-only tools: retrieve issue, discover files, search and read code"]
+        Tools -->|Source and issue context| Agent
+    end
+
+    API --> Agent
+    Tools -->|Read requests| GitHub["Public GitHub repository"]
+    GitHub -->|Repository data| Tools
+    Agent -->|Structured findings| Validation["Validate citations against retrieved source"]
+    Validation -->|Valid evidence| Report["Engineering report: likely causes, confidence, fixes and open questions"]
+    Validation -->|Invalid evidence| Failure["Failed investigation with diagnostic details"]
+    API -.-> Tracking["Saved history, live activity, duration, tokens and estimated cost"]
+    Agent -.-> Tracking
+```
+
+The agent repeats tool calls as needed within configured turn, tool, time, token,
+and cost limits. Reports cite file paths and line ranges from the pinned revision.
+Citation validation checks source support; root-cause conclusions remain hypotheses
+for engineers to review.
 
 ## Requirements
 
@@ -67,6 +97,31 @@ production builds. Tests need no external APIs or paid calls.
 
 See [code structure and testing](docs/code-structure.md) for the directory layout,
 test placement, file-comment conventions, and focused verification commands.
+
+## Investigation history and search
+
+Choose **Investigation history** in the header to browse saved runs, newest first.
+Search questions, report summaries, finding titles/explanations, and evidence file
+paths. Search uses SQLite FTS5: all entered words must match; punctuation separates
+words, and operators such as `OR` are treated as ordinary words.
+
+Combine search with an exact repository (GitHub URL or `owner/repo`), issue number,
+model name, and status. Results show 20 runs per page. **Open report** restores the
+saved investigation without making a new model request; failed or unfinished runs
+offer **View investigation**. Click **Search** again for current statuses.
+
+**Export Markdown** downloads a validated report with its question, findings,
+confidence, uncertainty, evidence excerpts, commit references, proposed fixes,
+verification plan, risks, open questions, and usage. Runs without a report cannot
+be exported. History and exports work without a configured model API key. Demo
+cases are illustrative fixtures and are not inserted into saved history.
+
+Existing saved runs are indexed automatically on startup, and updates keep the
+index synchronized. History belongs to this server's SQLite database. The current
+app has no user accounts: repository filters are not access controls. Before a
+shared cloud deployment, authentication and server-derived owner scoping must cover
+listing/search (including counts), reopening, exports, events, and cancellation.
+See [history storage and access design](docs/investigation-history.md).
 
 ## Investigation workspace
 
@@ -247,7 +302,9 @@ repository. `owner/repo` and `42` in architectural examples are placeholders.
 | Endpoint | Behavior |
 | --- | --- |
 | POST `/api/investigations` | Validate input and return 202 with queued run ID |
+| GET `/api/investigations` | Paginated history; `q`, `repository`, `issueNumber`, `model`, `status`, `limit`, `offset` |
 | GET `/api/investigations/:id` | Status, report, revision, duration, token usage, estimated cost |
+| GET `/api/investigations/:id/export` | Markdown attachment; 409 when no validated report exists |
 | GET `/api/investigations/:id/events` | SSE progress; reconnect with Last-Event-ID or `?after=ID` |
 | POST `/api/investigations/:id/cancel` | Cancel queued/running work |
 | GET `/api/health` | Service health; does not verify API access or balance |

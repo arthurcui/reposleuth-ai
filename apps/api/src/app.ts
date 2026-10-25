@@ -4,8 +4,12 @@ import fastifyStatic from '@fastify/static';
 import { healthSchema } from '@reposleuth/shared';
 import { registerInvestigations } from './routes/investigations.js';
 import type { InvestigationService } from './services/investigationService.js';
+import type { InvestigationStore } from './storage/sqlite.js';
 
-export function buildApp(service?: InvestigationService, options: { webRoot?: string } = {}) {
+export function buildApp(
+  service?: InvestigationService,
+  options: { webRoot?: string; store?: InvestigationStore } = {},
+) {
   const app = Fastify({ logger: false, bodyLimit: 16384 });
   app.addHook('onRequest', async (req, reply) => {
     // Loopback-only API: reject DNS rebinding and browser cross-origin requests.
@@ -28,7 +32,7 @@ export function buildApp(service?: InvestigationService, options: { webRoot?: st
     }
     reply.header('Cache-Control', 'no-store');
   });
-  registerInvestigations(app, service);
+  registerInvestigations(app, service, options.store);
   if (options.webRoot) {
     void app.register(fastifyStatic, {
       root: options.webRoot,

@@ -15,6 +15,7 @@ import {
 } from './features/investigations/client';
 import { demoForCase, demoCases } from './features/demo/demo';
 import { Report } from './features/investigations/Report';
+import { InvestigationHistory } from './features/history/InvestigationHistory';
 
 const currentId = () => new URLSearchParams(location.search).get('investigation');
 const currentCase = () => {
@@ -24,6 +25,7 @@ const currentCase = () => {
 const message = (error: unknown) =>
   error instanceof Error ? error.message : 'Unable to reach the local API.';
 export function App() {
+  const [showHistory, setShowHistory] = useState(false);
   const [id, setId] = useState(currentId);
   const [caseId, setCaseId] = useState(currentCase);
   const [run, setRun] = useState<Investigation | null>(null);
@@ -95,6 +97,7 @@ export function App() {
     let disposed = false;
     let loading = false;
     let terminal = false;
+    let formLoaded = false;
     const source = new EventSource(`/api/investigations/${encodeURIComponent(id)}/events`);
     setConnection('Connecting…');
     async function refresh() {
@@ -103,6 +106,13 @@ export function App() {
       try {
         const result = runSchema.parse(await api(`/${encodeURIComponent(id!)}`));
         if (disposed) return;
+        // Populate once when opening a saved run; later progress updates must preserve edits.
+        if (!formLoaded) {
+          setRepository(result.request.repository);
+          setIssue(result.request.issueNumber?.toString() ?? '');
+          setQuestion(result.request.question);
+          formLoaded = true;
+        }
         setRun(result);
         setError('');
         if (!isActive(result.status)) {
@@ -216,6 +226,14 @@ export function App() {
         <a className="brand" href="/">
           ◈ RepoSleuth <span>AI</span>
         </a>
+        <button
+          type="button"
+          className="secondary compact-button"
+          aria-expanded={showHistory}
+          onClick={() => setShowHistory((value) => !value)}
+        >
+          {showHistory ? 'Hide history' : 'Investigation history'}
+        </button>
       </header>
       <section className="intro">
         <p className="eyebrow">AUTONOMOUS ISSUE & CODE INVESTIGATOR</p>
@@ -229,6 +247,15 @@ export function App() {
           practical plan to fix it.
         </p>
       </section>
+      {showHistory && (
+        <InvestigationHistory
+          onClose={() => setShowHistory(false)}
+          onOpen={(next) => {
+            select(next);
+            setShowHistory(false);
+          }}
+        />
+      )}
       <div className="workspace">
         <section className={`panel${showingDemo ? ' demo-mode' : ''}`}>
           <div className="panel-heading">
@@ -279,21 +306,33 @@ export function App() {
             <p className="muted small">
               {showingDemo
                 ? 'Demo mode makes no API requests and uses no credits. Your live form entries are preserved.'
-                : 'Live investigations use your configured provider’s API credits and budget limits. Repository code is read, never executed.'}
+                : run && !active
+                  ? 'Run again creates a new investigation using these inputs and may incur API costs. The saved report stays unchanged.'
+                  : 'Live investigations use your configured provider’s API credits and budget limits. Repository code is read, never executed.'}
             </p>
             {showingDemo ? (
-              <button type="button" onClick={leaveDemo}>
+              <button
+                key="leave-demo"
+                type="button"
+                onClick={(event) => {
+                  // Cancel this click before React replaces the demo control with a submit button.
+                  event.preventDefault();
+                  leaveDemo();
+                }}
+              >
                 Start a real investigation →
               </button>
             ) : (
-              <button type="submit" disabled={busy}>
+              <button key="submit-investigation" type="submit" disabled={busy}>
                 {submitting
                   ? 'Starting…'
                   : active
                     ? 'Investigation in progress'
                     : busy
                       ? 'Loading investigation…'
-                      : 'Investigate →'}
+                      : run
+                        ? 'Run again'
+                        : 'Investigate →'}
               </button>
             )}
             <button
@@ -422,6 +461,15 @@ export function App() {
                 {run.request.issueNumber && ` · Issue #${run.request.issueNumber}`}
               </p>
               <p className="muted">{run.request.question}</p>
+              {!showingDemo && run.report && (
+                <a
+                  className="export-link"
+                  href={`/api/investigations/${encodeURIComponent(run.id)}/export`}
+                  download
+                >
+                  Export Markdown
+                </a>
+              )}
               <div className="metrics">
                 <div>
                   <strong>{`${(duration / 1000).toFixed(1)}s`}</strong>
