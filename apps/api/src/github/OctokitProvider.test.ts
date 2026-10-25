@@ -40,6 +40,20 @@ describe('repository selection', () => {
 });
 
 describe('read-only provider', () => {
+  it('reads the benchmark commit instead of a moving default branch', async () => {
+    const f = fixture(url => url.pathname.endsWith(`/commits/${FIXTURE_SHA}`)
+      ? { data: { sha: FIXTURE_SHA, commit: { tree: { sha: TREE_SHA } } } } : undefined);
+    const provider = await OctokitProvider.connect('owner/repo', {client:f.client,commitSha:FIXTURE_SHA});
+    expect(provider.revision.commitSha).toBe(FIXTURE_SHA);
+    expect(f.calls.some(url=>url.pathname.endsWith('/commits/main'))).toBe(false);
+  });
+  it('rejects invalid or mismatched benchmark revisions', async () => {
+    const f = fixture(url => url.pathname.endsWith(`/commits/${FIXTURE_SHA}`)
+      ? { data: { sha: 'b'.repeat(40), commit: { tree: { sha: TREE_SHA } } } } : undefined);
+    await expect(OctokitProvider.connect('owner/repo',{client:f.client,commitSha:'main'})).rejects.toMatchObject({code:'INVALID_REVISION'});
+    expect(f.calls).toHaveLength(0);
+    await expect(OctokitProvider.connect('owner/repo',{client:f.client,commitSha:FIXTURE_SHA})).rejects.toMatchObject({code:'INVALID_REVISION'});
+  });
   it('does not automatically retry rate-limited GitHub operations', async () => {
     const f = fixture(url => url.pathname.endsWith('/issues/42') ? { status: 429, data: { message: 'rate limited' }, headers: { 'retry-after': '60' } } : undefined);
     const provider = await f.connect();

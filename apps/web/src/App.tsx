@@ -78,7 +78,7 @@ export function App() {
         void refresh();
       } catch { /* Polling restores authoritative state if an event is malformed. */ }
     };
-    for (const name of ['queued', 'started', 'revision', 'tool_started', 'tool_finished', 'usage', 'validating', 'terminal']) source.addEventListener(name, receive as EventListener);
+    for (const name of ['queued', 'started', 'revision', 'tool_started', 'tool_finished', 'usage', 'validating', 'validation_failed', 'terminal']) source.addEventListener(name, receive as EventListener);
     source.onopen = () => { if (!disposed && !terminal) setConnection('Live updates'); };
     source.onerror = () => { if (terminal) source.close(); else if (!disposed) setConnection('Reconnecting · polling status'); };
     void refresh();
@@ -150,7 +150,7 @@ export function App() {
           {run.commitSha && <p className="muted small">Pinned commit: <code>{run.commitSha.slice(0, 12)}</code></p>}
           {active && <button className="secondary" onClick={() => void cancel()} disabled={cancelling}>{cancelling ? 'Stopping…' : 'Stop investigation'}</button>}
         </>}
-        {events.length > 0 && <ol className="timeline" aria-label="Investigation steps">{events.map(event => <li key={event.id}><time>{new Date(event.at).toLocaleTimeString()}</time><div><strong>{event.type.replaceAll('_', ' ')}</strong>{typeof event.data.name === 'string' && <span>{event.data.name.replaceAll('_', ' ')}</span>}{typeof event.data.outcome === 'string' && <span>{event.data.outcome}</span>}</div></li>)}</ol>}
+        {events.length > 0 && <ol className="timeline" aria-label="Investigation steps">{events.map(event => <li key={event.id}><time>{new Date(event.at).toLocaleTimeString()}</time><div><strong>{event.type.replaceAll('_', ' ')}</strong>{typeof event.data.name === 'string' && <span>{event.data.name.replaceAll('_', ' ')}</span>}{typeof event.data.reason === 'string' && <span>{event.data.reason.toLowerCase().replaceAll('_', ' ')}{typeof event.data.evidenceIndex === 'number' ? ` (evidence #${event.data.evidenceIndex})` : ''}</span>}{typeof event.data.outcome === 'string' && <span>{event.data.outcome}</span>}</div></li>)}</ol>}
         {run && !active && !run.report && <p className="muted">No validated report was produced. Review the status above before starting another investigation.</p>}
       </section>
     </div>

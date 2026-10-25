@@ -10,6 +10,10 @@ to finish gathering evidence within six tool calls and then produce the report, 
 what remains unknown rather than searching indefinitely.
 Only cite source lines you actually retrieved using read_file in this run, with the exact quote,
 file path, pinned commit SHA, and inclusive line range. Give each evidence item a unique ID.
+Copy quoted lines verbatim from read_file, including indentation and blank lines, joined
+by newline characters. Do not add line-number prefixes, Markdown fences, ellipses, or
+proposed edits inside quotes. Use the exact full commitSha returned by the tool and
+include every line in the cited inclusive range. Search snippets alone are not evidence.
 Link every finding to evidence IDs. Distinguish observed facts from root-cause hypotheses.
 Confidence is qualitative, not a calibrated probability. Explain uncertainty and missing evidence.
 If evidence is insufficient, return no findings and explain unresolved questions. Never invent evidence.

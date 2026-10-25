@@ -9,6 +9,10 @@ regression suite, Docker demo, and GitHub Actions checks. Real-model accuracy an
 latency targets remain unverified pending API credits and independent review.
 See [the implementation plan](IMPLEMENTATION_PLAN.md) for development history and acceptance checks.
 
+For real GitHub/model evaluation, see [the three public benchmark projects](docs/public-benchmarks.md):
+Node.js/TypeScript, C#/.NET, and React/TypeScript, with five issue investigations each.
+These are separate from the prewritten demo and scripted replay corpus.
+
 ## Requirements
 
 - Node.js 22.13+, 24.x, or 26+ and npm (Node 24 LTS recommended).
