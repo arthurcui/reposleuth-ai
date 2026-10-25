@@ -3,7 +3,8 @@ import { ToolCallError, type Model } from '@openai/agents';
 import type { Investigation, InvestigationRequest, InvestigationStatus } from '@reposleuth/shared';
 import type { RepositoryProvider } from '../github/RepositoryProvider.js';
 import { RepositoryError } from '../github/RepositoryProvider.js';
-import { DEFAULT_LIMITS, MODEL, emptyUsage, StopError, type RunLimits } from '../agents/budget.js';
+import { DEFAULT_LIMITS, emptyUsage, StopError, type RunLimits } from '../agents/budget.js';
+import { OPENAI, type ProviderConfig } from '../agents/provider.js';
 import { investigate } from '../agents/investigator.js';
 import { InvestigationStore } from '../storage/sqlite.js';
 
@@ -13,7 +14,7 @@ export class InvestigationService {
   private closed = false;
   private readonly limits: RunLimits;
   constructor(readonly store: InvestigationStore, private readonly repository: (input: string) => Promise<RepositoryProvider>,
-    private readonly model: () => Model, limits: Partial<RunLimits> = {}, private readonly lifetimeBudgetUsd = 1) {
+    private readonly model: () => Model, limits: Partial<RunLimits> = {}, private readonly lifetimeBudgetUsd = 1, private readonly provider: ProviderConfig = OPENAI) {
     this.limits = { ...DEFAULT_LIMITS, ...limits };
     for (const record of store.active()) {
       record.status = 'interrupted'; record.errorCode = 'PROCESS_RESTARTED'; record.finishedAt = new Date().toISOString();
@@ -26,7 +27,7 @@ export class InvestigationService {
     if (this.queue.length + (this.active ? 1 : 0) >= 5) throw new StopError('QUEUE_FULL');
     if (this.store.reserved() >= this.lifetimeBudgetUsd) throw new StopError('BUDGET_EXCEEDED');
     const record: Investigation = { id: randomUUID(), request, status: 'queued', createdAt: new Date().toISOString(),
-      startedAt: null, finishedAt: null, durationMs: 0, commitSha: null, report: null, errorCode: null, usage: emptyUsage(), model: MODEL };
+      startedAt: null, finishedAt: null, durationMs: 0, commitSha: null, report: null, errorCode: null, usage: emptyUsage(), model: this.provider.model };
     this.store.save(record); this.store.append(record.id, 'queued', {});
     this.queue.push(record.id);
     setImmediate(() => { void this.drain(); });
@@ -50,7 +51,7 @@ export class InvestigationService {
     const controller = new AbortController();
     this.active = { id, controller };
     record.status = 'running'; record.startedAt = new Date().toISOString();
-    this.store.save(record); this.store.append(id, 'started', { model: MODEL, limits: this.limits });
+    this.store.save(record); this.store.append(id, 'started', { model: this.provider.model, limits: this.limits });
     let terminal = false;
     const save = () => { if (!this.closed && !terminal) this.store.save(record); };
     const emit = (type: string, data: Record<string, unknown>) => { if (!this.closed && !terminal) this.store.append(id, type, data); };
@@ -80,7 +81,7 @@ export class InvestigationService {
           }
           if (controller.signal.aborted || this.closed) throw new StopError('CANCELLED');
         }
-        return investigate({ repository, request: record.request, model: this.model(), limits: this.limits,
+        return investigate({ provider: this.provider, repository, request: record.request, model: this.model(), limits: this.limits,
           usage: record.usage, signal: controller.signal,
           reserve: usd => { if (controller.signal.aborted || this.closed) throw new StopError('CANCELLED'); this.store.reserve(usd, this.lifetimeBudgetUsd); },
           saveUsage: () => { save(); emit('usage', { ...record.usage }); }, emit });
@@ -90,9 +91,9 @@ export class InvestigationService {
     } catch (error) {
       const cause = error instanceof ToolCallError ? error.error : error;
       const code = cause instanceof StopError || cause instanceof RepositoryError ? cause.code
-        : cause instanceof Error && cause.name === 'MaxTurnsExceededError' ? 'BUDGET_EXCEEDED' : 'INVESTIGATION_FAILED';
+        : cause instanceof Error && cause.name === 'MaxTurnsExceededError' ? 'BUDGET_EXCEEDED_REQUESTS' : 'INVESTIGATION_FAILED';
       const states: Record<string, InvestigationStatus> = { BUDGET_EXCEEDED: 'budget_exceeded', TIMEOUT: 'timed_out', CANCELLED: 'cancelled' };
-      record.status = states[code] ?? 'failed'; record.errorCode = code;
+      record.status = code.startsWith('BUDGET_EXCEEDED') ? 'budget_exceeded' : states[code] ?? 'failed'; record.errorCode = code;
     } finally {
       terminal = true; clearTimeout(timer); controller.signal.removeEventListener('abort', onAbort);
       record.finishedAt = new Date().toISOString(); record.durationMs = Date.now() - Date.parse(record.startedAt!);

@@ -2,13 +2,16 @@ import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { InvestigationStore } from '../storage/sqlite.js';
 import { InvestigationService } from '../services/investigationService.js';
+import { providerConfig } from './provider.js';
 import { liveModel } from './investigator.js';
 import { fakeRepository } from '../tests/agentFixtures.js';
 import { SOURCE } from '../github/fixtures.js';
 
 // Explicit opt-in only; never runs in npm test/check. Uses synthetic source, not private code.
 config({ path: fileURLToPath(new URL('../../../../.env.local', import.meta.url)), quiet: true });
-if (process.argv[2] !== '--live' || !process.env.OPENAI_API_KEY) {
+const llm = providerConfig();
+const key = process.env[llm.keyVariable];
+if (process.argv[2] !== '--live' || !key) {
   console.error('Requires a saved key and explicit --live flag. This performs paid model calls.');
   process.exitCode = 1;
 } else {
@@ -17,7 +20,7 @@ if (process.argv[2] !== '--live' || !process.env.OPENAI_API_KEY) {
   provider.readFile = async () => ({ ...provider.revision, path: 'src/customers.ts', startLine: 1, endLine: 7, totalLines: 7,
     lines: SOURCE.trimEnd().split('\n').map((text, index) => ({ line: index + 1, text })) });
   const service = new InvestigationService(store, async () => provider, () => {
-    const model = liveModel(process.env.OPENAI_API_KEY!);
+    const model = liveModel(key, llm);
     return {
       getStreamedResponse: model.getStreamedResponse.bind(model),
       getResponse: async (request: Parameters<typeof model.getResponse>[0]) => {
@@ -33,7 +36,7 @@ if (process.argv[2] !== '--live' || !process.env.OPENAI_API_KEY) {
       },
     };
   },
-    { turns: 6, tools: 8, costUsd: 0.02, timeoutMs: 90000 }, 0.05);
+    { turns: 6, tools: 8, costUsd: 0.02, timeoutMs: 90000 }, 0.05, llm);
   try {
     const run = service.start({ repository: 'owner/repo', question: 'Synthetic fixture: read src/customers.ts lines 1-7, investigate query scaling, and propose a fix. Cite exact source. No runtime evidence exists.' });
     while (true) {

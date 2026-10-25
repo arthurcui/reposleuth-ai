@@ -3,6 +3,8 @@ services:
   reposleuth:
     environment:
       DEMO_ONLY: "0"
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in the calling environment}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       APP_BUDGET_USD: ${APP_BUDGET_USD:-1}

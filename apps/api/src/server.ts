@@ -4,6 +4,7 @@ import { buildApp } from './app.js';
 import { InvestigationStore } from './storage/sqlite.js';
 import { InvestigationService } from './services/investigationService.js';
 import { OctokitProvider } from './github/OctokitProvider.js';
+import { providerConfig } from './agents/provider.js';
 import { liveModel } from './agents/investigator.js';
 
 // Resolves to the workspace root in both src/ and dist/.
@@ -14,11 +15,12 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 }
 const appBudget = Number(process.env.APP_BUDGET_USD ?? 1);
 if (!Number.isFinite(appBudget) || appBudget <= 0 || appBudget > 5) throw new Error('APP_BUDGET_USD must be greater than zero and at most 5');
-const apiKey = process.env.DEMO_ONLY === '1' ? undefined : process.env.OPENAI_API_KEY;
+const provider = providerConfig();
+const apiKey = process.env.DEMO_ONLY === '1' ? undefined : process.env[provider.keyVariable];
 const service = apiKey ? new InvestigationService(
   new InvestigationStore(fileURLToPath(new URL('../../../data/investigations.sqlite', import.meta.url))),
   repository => OctokitProvider.connect(repository, { token: process.env.GITHUB_TOKEN }),
-  () => liveModel(apiKey), {}, appBudget,
+  () => liveModel(apiKey, provider), {}, appBudget, provider,
 ) : undefined;
 const app = buildApp(service, process.env.SERVE_WEB === '1'
   ? { webRoot: fileURLToPath(new URL('../../web/dist/', import.meta.url)) } : {});
