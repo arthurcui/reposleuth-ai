@@ -24,11 +24,13 @@ flowchart TD
     Request["Repository URL + issue or investigation question"] --> API["API: pin repository revision and start investigation"]
 
     subgraph Investigation["Bounded agent investigation"]
-        Agent["AI agent: OpenAI or Gemini"] -->|Select next tool| Tools["Read-only tools: retrieve issue, discover files, search and read code"]
+        Agent["Investigation orchestrator: context, tool execution and budget limits"] -->|Execute requested tool| Tools["Read-only tools: retrieve issue, discover files, search and read code"]
         Tools -->|Source and issue context| Agent
     end
 
     API --> Agent
+    Agent -->|Context and tool definitions| Models["External model APIs: OpenAI GPT or Google Gemini"]
+    Models -->|Tool calls or structured findings| Agent
     Tools -->|Read requests| GitHub["Public GitHub repository"]
     GitHub -->|Repository data| Tools
     Agent -->|Structured findings| Validation["Validate citations against retrieved source"]
@@ -38,6 +40,8 @@ flowchart TD
     Agent -.-> Tracking
 ```
 
+The orchestrator calls the selected external model for reasoning and tool selection,
+then executes the requested tools and returns their results to the model.
 The agent repeats tool calls as needed within configured turn, tool, time, token,
 and cost limits. Reports cite file paths and line ranges from the pinned revision.
 Citation validation checks source support; root-cause conclusions remain hypotheses
@@ -88,6 +92,32 @@ tokens and $2.50 per million output tokens, even on the free tier. These are
 conservative estimates, not invoices; free-tier availability and limits depend on
 Google's account rules. [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing)
 (checked October 24, 2026).
+
+## Investigation depth
+
+Choose a mode before starting; Standard remains the default for older clients and saved runs.
+
+| Mode     | Time limit | Estimated cost limit | Model requests | Tool calls | Token limit |
+| -------- | ---------- | -------------------- | -------------- | ---------- | ----------- |
+| Quick    | 1 minute   | $0.02                | 6              | 10         | 50,000      |
+| Standard | 2 minutes  | $0.05                | 12             | 24         | 100,000     |
+| Deep     | 5 minutes  | $0.15                | 24             | 48         | 300,000     |
+
+Quick follows the most likely path. Standard checks the relevant path and an alternative
+explanation. Deep asks the model to inspect related callers, callees, safeguards and tests,
+compare competing causes, and actively look for counter-evidence. All modes retain the same
+2,000-token per-response cap: depth allocates more investigation capacity, not longer answers.
+Coverage depends on available source and remaining budget; missing checks must be disclosed.
+
+New reports include an evidence-based reasoning summary with cited assessments, alternatives,
+counter-evidence and limitations, also included in Markdown exports. References are validated
+against source read during the run; this verifies citations, not the correctness of a hypothesis.
+Older reports remain readable without manufacturing a reasoning summary.
+
+Limits apply to an active run (queue time excluded). Conservative request reservations,
+token/context limits and the persistent server budget can stop work earlier. Cost caps use
+configured pricing estimates, not provider billing guarantees. Mode selection never launches
+a request by itself; starting an investigation still requires submission.
 
 ## Verify
 
@@ -251,16 +281,16 @@ and reject a start beyond EOF, including empty files.
 
 Limits per provider instance:
 
-| Resource | Limit |
-| --- | --- |
-| Eligible tree entries / returned paths | 5,000 / 500 |
-| Individual source file | 128 KiB, UTF-8 only |
-| Search index | First 40 eligible paths in sorted order, at most 2 MiB |
-| Search | Literal, case-sensitive, 2–200 characters; 30 matching lines |
-| Source read | 200 lines and 24,000 characters |
-| Issue comments / field text | 20 / 8,000 characters |
-| File history / diff pagination | 10 commits / 300 changed files |
-| Network | 2 setup requests + up to 55 operation requests; 15-second request timeout |
+| Resource                               | Limit                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------- |
+| Eligible tree entries / returned paths | 5,000 / 500                                                               |
+| Individual source file                 | 128 KiB, UTF-8 only                                                       |
+| Search index                           | First 40 eligible paths in sorted order, at most 2 MiB                    |
+| Search                                 | Literal, case-sensitive, 2–200 characters; 30 matching lines              |
+| Source read                            | 200 lines and 24,000 characters                                           |
+| Issue comments / field text            | 20 / 8,000 characters                                                     |
+| File history / diff pagination         | 10 commits / 300 changed files                                            |
+| Network                                | 2 setup requests + up to 55 operation requests; 15-second request timeout |
 
 Search indexes are in memory and cached per instance. Binary files, symlinks,
 submodules, dependency/build directories, env files, lockfiles, and common binary
@@ -302,15 +332,15 @@ Invoke-RestMethod "http://127.0.0.1:3001/api/investigations/$($run.id)"
 For an issue investigation, add `issueNumber` with a real issue number in that public
 repository. `owner/repo` and `42` in architectural examples are placeholders.
 
-| Endpoint | Behavior |
-| --- | --- |
-| POST `/api/investigations` | Validate input and return 202 with queued run ID |
-| GET `/api/investigations` | Paginated history; `q`, `repository`, `issueNumber`, `model`, `status`, `limit`, `offset` |
-| GET `/api/investigations/:id` | Status, report, revision, duration, token usage, estimated cost |
-| GET `/api/investigations/:id/export` | Markdown attachment; 409 when no validated report exists |
-| GET `/api/investigations/:id/events` | SSE progress; reconnect with Last-Event-ID or `?after=ID` |
-| POST `/api/investigations/:id/cancel` | Cancel queued/running work |
-| GET `/api/health` | Service health; does not verify API access or balance |
+| Endpoint                              | Behavior                                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| POST `/api/investigations`            | Validate input and return 202 with queued run ID                                          |
+| GET `/api/investigations`             | Paginated history; `q`, `repository`, `issueNumber`, `model`, `status`, `limit`, `offset` |
+| GET `/api/investigations/:id`         | Status, report, revision, duration, token usage, estimated cost                           |
+| GET `/api/investigations/:id/export`  | Markdown attachment; 409 when no validated report exists                                  |
+| GET `/api/investigations/:id/events`  | SSE progress; reconnect with Last-Event-ID or `?after=ID`                                 |
+| POST `/api/investigations/:id/cancel` | Cancel queued/running work                                                                |
+| GET `/api/health`                     | Service health; does not verify API access or balance                                     |
 
 SSE emits queued, started, revision, tool_started, tool_finished, usage, validating,
 and terminal events. These contain tool names/outcomes, not raw tool inputs, source,

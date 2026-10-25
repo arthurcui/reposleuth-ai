@@ -7,6 +7,13 @@ import type { RepositoryProvider } from '../../src/github/RepositoryProvider.js'
 export const SHA = 'a'.repeat(40);
 export function validReport(): InvestigationReport {
   return {
+    reasoningSummary: {
+      assessment: 'Potential repeated calls; frequency is not verified.',
+      evidenceIds: ['e1'],
+      alternatives: [],
+      counterEvidence: [],
+      limitations: 'Scripted fixture; no runtime verification or alternative-path coverage.',
+    },
     summary: 'Potential repeated database calls.',
     findings: [
       {

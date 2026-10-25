@@ -305,3 +305,39 @@ describe('investigation UI', () => {
     expect(sourceUrl('https://evil.test', 'a'.repeat(40), 'x', 1, 2)).toBeNull();
   });
 });
+
+it('shows mode limits and preserves the selected mode across a demo visit without submitting', () => {
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  render(<App />);
+  const picker = screen.getByLabelText('Investigation mode') as HTMLSelectElement;
+  expect(picker.value).toBe('standard');
+  fireEvent.change(picker, { target: { value: 'deep' } });
+  expect(screen.getByRole('option', { name: 'Deep · up to 5 min · $0.15' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Show demo investigation' }));
+  expect(picker.disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Start a real investigation →' }));
+  expect(picker.value).toBe('deep');
+  expect(picker.disabled).toBe(false);
+  expect(fetch).not.toHaveBeenCalled();
+});
+it('restores a saved mode and renders cited reasoning without launching a run', async () => {
+  history.replaceState(null, '', '/?investigation=saved-run');
+  const saved = structuredClone(demo);
+  saved.id = 'saved-run';
+  saved.request.mode = 'deep';
+  saved.report!.reasoningSummary = {
+    assessment: 'Evidence suggests a repeated call.',
+    evidenceIds: [saved.report!.evidence[0]!.id],
+    alternatives: [{ explanation: 'Network behavior is unmeasured.', evidenceIds: [] }],
+    counterEvidence: [],
+    limitations: 'No runtime measurement.',
+  };
+  const fetch = vi.fn(async () => ({ ok: true, json: async () => saved }));
+  vi.stubGlobal('fetch', fetch);
+  render(<App />);
+  await screen.findByRole('heading', { name: 'Evidence-based reasoning summary' });
+  expect((screen.getByLabelText('Investigation mode') as HTMLSelectElement).value).toBe('deep');
+  expect(screen.getByText('Unverified · no source citation')).toBeTruthy();
+  expect(fetch).toHaveBeenCalledTimes(1);
+});

@@ -1,4 +1,6 @@
 /** Renders investigation status, metrics, demo selection, and event activity. */
+import { investigationModes } from '@reposleuth/shared';
+
 import { demoCases } from '../demo/demo';
 import { errorMessage } from './client';
 import type { InvestigationWorkspace } from './useInvestigationWorkspace';
@@ -136,6 +138,17 @@ export function InvestigationActivity({ workspace }: { workspace: InvestigationW
               {run.request.issueNumber && ` · Issue #${run.request.issueNumber}`}
             </p>
             <p className="muted">{run.request.question}</p>
+            {!showingDemo && (
+              <p className="muted small">
+                {investigationModes[run.request.mode ?? 'standard'].label} mode
+                {run.limits && (
+                  <>
+                    {' '}
+                    · limit {run.limits.timeoutMs / 60000} min · ${run.limits.costUsd.toFixed(2)}
+                  </>
+                )}
+              </p>
+            )}
             {!showingDemo && run.report && (
               <a
                 className="export-link"

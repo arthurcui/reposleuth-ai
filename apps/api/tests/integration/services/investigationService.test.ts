@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { Model } from '@openai/agents';
+import { investigationModes, investigationRequestSchema } from '@reposleuth/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from '../../../src/app.js';
@@ -262,4 +263,48 @@ describe('investigation lifecycle and API', () => {
     expect((await app.inject('/api/investigations/missing')).statusCode).toBe(404);
     await app.close();
   });
+});
+
+it.each(['quick', 'standard', 'deep'] as const)(
+  'enforces and persists %s mode budgets and investigation policy',
+  async (mode) => {
+    const model = new ScriptedModel();
+    const service = make(() => model);
+    const run = await finish(service, service.start({ ...request, mode }).id);
+    expect(run.status).toBe('completed');
+    expect(run.request.mode).toBe(mode);
+    const profile = investigationModes[mode];
+    expect(run.limits).toMatchObject({
+      costUsd: profile.costUsd,
+      timeoutMs: profile.timeoutMs,
+      turns: profile.turns,
+      tools: profile.tools,
+    });
+    expect(
+      service.store.events(run.id).find((event) => event.type === 'started')?.data,
+    ).toMatchObject({ mode, limits: { costUsd: profile.costUsd } });
+    expect(model.requests[0]?.systemInstructions).toContain(`${profile.label}:`);
+    expect(model.requests[0]?.modelSettings.maxTokens).toBe(2000);
+    if (mode === 'deep') {
+      expect(model.requests[0]?.systemInstructions).toContain('counter-evidence');
+      expect(model.requests[0]?.systemInstructions).toContain(
+        'two plausible competing explanations',
+      );
+    }
+  },
+);
+it('keeps explicit server ceilings below mode budgets and stops before a model call', async () => {
+  const model = new ScriptedModel();
+  const service = make(() => model, { costUsd: 0.000001, timeoutMs: 900000 });
+  const run = await finish(service, service.start({ ...request, mode: 'deep' }).id);
+  expect(run.status).toBe('budget_exceeded');
+  expect(run.limits).toMatchObject({ costUsd: 0.000001, timeoutMs: 300000 });
+  expect(model.requests).toHaveLength(0);
+});
+it('accepts legacy requests but rejects unknown modes and client-defined limits', () => {
+  expect(investigationRequestSchema.safeParse(request).success).toBe(true);
+  expect(investigationRequestSchema.safeParse({ ...request, mode: 'unlimited' }).success).toBe(
+    false,
+  );
+  expect(investigationRequestSchema.safeParse({ ...request, costUsd: 100 }).success).toBe(false);
 });

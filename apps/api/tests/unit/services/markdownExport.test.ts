@@ -36,3 +36,20 @@ it('escapes markup and keeps source fence delimiters inside the quote', () => {
     'REPORT_NOT_AVAILABLE',
   );
 });
+
+it('exports cited reasoning and clearly marks unchecked alternatives', () => {
+  const run = savedInvestigation();
+  run.request.mode = 'deep';
+  run.report!.reasoningSummary = {
+    assessment: 'Repeated database calls may explain latency.',
+    evidenceIds: ['e1'],
+    alternatives: [{ explanation: 'Network latency has not been measured.', evidenceIds: [] }],
+    counterEvidence: [],
+    limitations: 'No runtime profiling.',
+  };
+  const markdown = exportMarkdown(run);
+  expect(markdown).toContain('Mode: deep');
+  expect(markdown).toContain('## Evidence-based reasoning summary');
+  expect(markdown).toContain('Unverified');
+  expect(markdown).toContain('Limitations: No runtime profiling');
+});

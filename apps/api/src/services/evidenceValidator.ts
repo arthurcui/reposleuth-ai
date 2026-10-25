@@ -53,6 +53,14 @@ export function validateEvidence(
   }
   if (report.findings.some((finding) => finding.evidenceIds.some((id) => !ids.has(id))))
     throw new EvidenceValidationError('UNKNOWN_EVIDENCE_ID');
+  const reasoning = report.reasoningSummary;
+  if (
+    reasoning &&
+    [reasoning, ...reasoning.alternatives, ...reasoning.counterEvidence].some((item) =>
+      item.evidenceIds.some((id) => !ids.has(id)),
+    )
+  )
+    throw new EvidenceValidationError('UNKNOWN_EVIDENCE_ID');
   if (!report.findings.length && !report.unresolvedQuestions.length)
     throw new StopError('INVALID_REPORT');
   return report;

@@ -21,6 +21,50 @@ export function Report({ run }: { run: Investigation }) {
           Source references support the reasoning. Proposed fixes have not been applied or tested.
         </p>
       </div>
+      {report.reasoningSummary && (
+        <section className="panel" aria-label="Evidence-based reasoning summary">
+          <h3>Evidence-based reasoning summary</h3>
+          {(
+            [
+              [
+                'Assessment',
+                [
+                  {
+                    explanation: report.reasoningSummary.assessment,
+                    evidenceIds: report.reasoningSummary.evidenceIds,
+                  },
+                ],
+              ],
+              ['Alternatives considered', report.reasoningSummary.alternatives],
+              ['Counter-evidence checked', report.reasoningSummary.counterEvidence],
+            ] as const
+          ).map(([title, entries]) => (
+            <div key={title}>
+              <h4>{title}</h4>
+              {!entries.length && <p className="muted">No assessment recorded.</p>}
+              {entries.map((entry, index) => (
+                <div key={index}>
+                  <p>{entry.explanation}</p>
+                  {!entry.evidenceIds.length && (
+                    <p className="muted small">Unverified · no source citation</p>
+                  )}
+                  <div className="references">
+                    {entry.evidenceIds.map((id) => (
+                      <a key={id} href={`#evidence-${encodeURIComponent(id)}`}>
+                        View evidence {evidenceLabel(id)} ↓
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          <p className="muted">
+            <strong>Limitations: </strong>
+            {report.reasoningSummary.limitations}
+          </p>
+        </section>
+      )}
       {report.findings.map((finding, index) => (
         <article className="panel" key={index}>
           <div className="panel-heading">

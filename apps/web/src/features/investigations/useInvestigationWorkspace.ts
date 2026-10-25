@@ -2,6 +2,7 @@
 import {
   type Investigation,
   type InvestigationEvent,
+  type InvestigationMode,
   investigationRequestSchema,
 } from '@reposleuth/shared';
 import { type FormEvent, useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ const currentCase = () => {
 const message = (error: unknown) =>
   error instanceof Error ? error.message : 'Unable to reach the local API.';
 export function useInvestigationWorkspace() {
+  const [mode, setMode] = useState<InvestigationMode>('standard');
   const [modelSelection, setModelSelection] = useState('');
   const [id, setId] = useState(currentId);
   const [caseId, setCaseId] = useState(currentCase);
@@ -103,6 +105,7 @@ export function useInvestigationWorkspace() {
           setRepository(result.request.repository);
           setIssue(result.request.issueNumber?.toString() ?? '');
           setQuestion(result.request.question);
+          setMode(result.request.mode ?? 'standard');
           const selection = result.request.modelSelection;
           setModelSelection(
             selection
@@ -117,7 +120,7 @@ export function useInvestigationWorkspace() {
         setError('');
         if (!isActive(result.status)) {
           terminal = true;
-          setConnection('Saved locally');
+          setConnection('Saved to history');
         }
       } catch (cause) {
         if (!disposed) {
@@ -185,6 +188,7 @@ export function useInvestigationWorkspace() {
     setError('');
     const parsed = investigationRequestSchema.safeParse({
       repository,
+      mode,
       ...(issue ? { issueNumber: Number(issue) } : {}),
       question,
       ...(modelSelection
@@ -236,6 +240,8 @@ export function useInvestigationWorkspace() {
       : run.durationMs
     : 0;
   return {
+    mode,
+    setMode,
     modelSelection,
     setModelSelection,
     id,

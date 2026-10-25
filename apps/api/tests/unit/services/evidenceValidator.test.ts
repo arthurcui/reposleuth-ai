@@ -51,3 +51,25 @@ it.each([
     expect.objectContaining({ code: 'INVALID_EVIDENCE', reason }),
   );
 });
+
+it.each(['assessment', 'alternatives', 'counterEvidence'] as const)(
+  'rejects invented citations in reasoning %s',
+  async (section) => {
+    const repository = fakeRepository();
+    const source = await repository.readFile('src/customers.ts', 1, 1);
+    const report = validReport();
+    const reasoning = report.reasoningSummary!;
+    if (section === 'assessment') reasoning.evidenceIds = ['invented'];
+    else reasoning[section] = [{ explanation: 'Unsupported assertion', evidenceIds: ['invented'] }];
+    expect(() => validateEvidence(report, repository.revision, [source])).toThrow(
+      expect.objectContaining({ code: 'INVALID_EVIDENCE', reason: 'UNKNOWN_EVIDENCE_ID' }),
+    );
+  },
+);
+it('continues to validate older reports without a reasoning summary', async () => {
+  const repository = fakeRepository();
+  const source = await repository.readFile('src/customers.ts', 1, 1);
+  const report = validReport();
+  delete report.reasoningSummary;
+  expect(validateEvidence(report, repository.revision, [source]).reasoningSummary).toBeUndefined();
+});
