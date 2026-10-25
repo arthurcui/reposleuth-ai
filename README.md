@@ -13,7 +13,7 @@ See [the implementation plan](IMPLEMENTATION_PLAN.md) for development history an
 
 - Node.js 22.13+, 24.x, or 26+ and npm (Node 24 LTS recommended).
 - Network access to npm for installing dependencies.
-- No GitHub or OpenAI credentials required for tests, replay evaluation, or the demo.
+- No GitHub or LLM credentials required for tests, replay evaluation, or the demo.
 
 ## Run locally
 
@@ -32,6 +32,25 @@ Root `.env.local` is loaded only by the backend. If it does not exist, copy
 credential file. Never prefix secrets with `VITE_` or commit env files. The Vite
 configuration reads only PORT from the root environment for its development proxy.
 Health responses contain no configuration values or secrets.
+
+### Choose OpenAI or Gemini
+
+Set `LLM_PROVIDER=openai` (the default) with `OPENAI_API_KEY`, or set
+`LLM_PROVIDER=gemini` with `GEMINI_API_KEY` in the root `.env.local`, then restart
+the API. Gemini uses `gemini-3.5-flash-lite`; OpenAI keeps `gpt-6-luna`.
+Provider selection is server-wide and applies to new investigations, the live
+smoke command, and live evaluations. Saved reports keep their original model.
+There is no automatic fallback to another provider or key.
+
+Get a Gemini key from [Google AI Studio](https://aistudio.google.com/apikey) and
+save it directly in the local env file. Keys stay on the backend. Gemini uses
+[Google's OpenAI-compatible endpoint](https://ai.google.dev/gemini-api/docs/openai)
+with the same read-only tools, evidence validation, cancellation, and budget limits.
+For text requests, estimates use standard paid rates of $0.30 per million input
+tokens and $2.50 per million output tokens, even on the free tier. These are
+conservative estimates, not invoices; free-tier availability and limits depend on
+Google's account rules. [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing)
+(checked October 24, 2026).
 
 ## Verify
 
@@ -57,6 +76,11 @@ the persisted result on the same local server. SSE reconnects replay events and
 status polling provides a fallback. Closing the tab does not cancel work.
 Quota, budget, cancellation, timeout, and interrupted states are displayed explicitly.
 Missing token usage is labeled incomplete with the reserved amount shown.
+New runs distinguish request, tool, context, token, and cost limits. Pre-request
+checks include a conservative allowance for the next call, so a run may stop below
+the displayed usage totals. Give a concrete issue or symptom: a generic repository
+request is instructed to do only brief discovery and ask for missing details in its
+report rather than attempt an unrestricted audit.
 
 Choose **Show demo investigation**, or open http://127.0.0.1:5173/?investigation=demo,
 to browse all 20 synthetic cases using the **Explore the 20 defect cases** selector.
@@ -97,7 +121,8 @@ runs as a non-root user with a read-only filesystem. Stop with `docker compose d
 the volume is retained. Do not use `down -v` unless you intend to delete stored runs
 and budget history.
 
-To explicitly enable paid investigations, supply `OPENAI_API_KEY` in your shell
+To explicitly enable live investigations, supply `LLM_PROVIDER` and the matching
+`OPENAI_API_KEY` or `GEMINI_API_KEY` in your shell
 environment and run:
 
 ```sh
@@ -194,7 +219,7 @@ Tests are proposed, never executed by the agent. Repository content remains untr
 
 ## Run an investigation via the API
 
-Save `OPENAI_API_KEY` in root `.env.local`, then run `npm run dev`. The backend
+Select a provider and save its key in root `.env.local` (see above), then run `npm run dev`. The backend
 loads the key server-side only. Starting the server or checking health costs nothing;
 submitting an investigation makes paid API requests. Without a key, POST returns 503.
 
@@ -236,8 +261,9 @@ server binds loopback and rejects nonlocal Host and unapproved browser Origin he
 
 The default model is `gpt-6-luna` with low reasoning effort, standard processing,
 remote tracing disabled, response storage disabled, and automatic model retries disabled.
-Public source excerpts and the investigation question are sent to OpenAI for inference.
-The model is fixed in code so changing it requires reviewing its pricing and behavior.
+Public source excerpts and the investigation question are sent to the selected provider for inference.
+Gemini uses Flash-Lite with minimal thinking; remote tracing and automatic retries remain disabled.
+Each provider’s model is fixed in code so changing it requires reviewing its pricing and behavior.
 
 Per run: 12 model requests, 24 tool calls, 100,000 total reported tokens, 2,000 output
 tokens per request, 80,000 estimated input tokens per request, a 120-second deadline,
@@ -252,14 +278,14 @@ usage is accumulated after responses; missing usage leaves `usageIncomplete: tru
 and a nonzero `reservedCostUsd`. `estimatedCostUsd` uses recorded token counts at
 conservative rates and is not an invoice amount.
 
-Rates checked 2026-10-22: standard input US$0.10, cache writes US$0.125, output US$0.50
+OpenAI rates checked 2026-10-22: standard input US$0.10, cache writes US$0.125, output US$0.50
 per million tokens. Budget calculations price all input at US$0.125 to allow for cache
 writes. See [official model pricing](https://developers.openai.com/api/docs/models/gpt-6-luna).
 
 `APP_BUDGET_USD` defaults to US$1 and supports values above zero up to US$5. The SQLite
 ledger reserves cost atomically and never refunds reservations, even on success. It
 therefore stops conservatively, persists across restarts, and is separate from your
-OpenAI account balance. Deleting the database removes this safeguard's history. Keep
+provider account balance. Deleting the database removes this safeguard's history. Keep
 auto-reload disabled in your billing settings if you do not want automatic purchases.
 
 ### Verification

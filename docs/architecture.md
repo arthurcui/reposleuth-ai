@@ -8,7 +8,7 @@ flowchart LR
   Preflight --> Agent[Bounded Agents SDK loop]
   Agent --> Tools[Six read-only tools]
   Tools --> GitHub[Octokit / public GitHub]
-  Agent --> Model[OpenAI Responses model]
+  Agent --> Model[OpenAI Responses or Gemini Chat Completions]
   Agent --> Validator[Exact citation validation]
   Validator --> Store[(SQLite reports and events)]
   Queue --> Store
@@ -36,7 +36,7 @@ Default model limits: 12 turns, 24 tool calls, 100,000 reported tokens, 2,000 ou
 tokens/request, 120 seconds, and $0.05 estimated cost/run. Provider limits and input
 estimation are described in the README. Before model calls, a persistent ledger
 reserves a conservative bound. Reservations are not refunded and are not invoices.
-Incomplete usage remains labeled. OpenAI retries are disabled; GitHub rate-limit
+Incomplete usage remains labeled. Model retries are disabled; GitHub rate-limit
 failures are surfaced without automatic retries. A user may explicitly start a new
 run after addressing the cause; it has a new budget reservation.
 

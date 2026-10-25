@@ -8,15 +8,16 @@ import { cases, type EvalCase } from './cases.js';
 import { fixtureRepository, ReplayModel } from './fixtures.js';
 import { InvestigationService } from '../services/investigationService.js';
 import { InvestigationStore } from '../storage/sqlite.js';
+import { providerConfig, OPENAI, type ProviderConfig } from '../agents/provider.js';
 import { liveModel } from '../agents/investigator.js';
 import { validateEvidence } from '../services/evidenceValidator.js';
 
-export async function runCase(test: EvalCase, options: { key?: string; budgetUsd?: number; ledgerPath?: string } = {}) {
+export async function runCase(test: EvalCase, options: { key?: string; provider?: ProviderConfig; budgetUsd?: number; ledgerPath?: string } = {}) {
   const repository = fixtureRepository(test);
   const store = new InvestigationStore(options.ledgerPath ?? ':memory:');
   const service = new InvestigationService(store, async () => repository,
-    () => options.key ? liveModel(options.key) : new ReplayModel(test),
-    { costUsd: 0.02, timeoutMs: 60000 }, options.budgetUsd ?? 1);
+    () => options.key ? liveModel(options.key, options.provider) : new ReplayModel(test),
+    { costUsd: 0.02, timeoutMs: 60000 }, options.budgetUsd ?? 1, options.provider);
   const started = performance.now();
   try {
     const id = service.start({ repository: repository.revision.repository, issueNumber: 1, question: test.question }).id;
@@ -30,7 +31,7 @@ export async function runCase(test: EvalCase, options: { key?: string; budgetUsd
     const tools = store.events(id).filter(event => event.type === 'tool_started').map(event => String(event.data.name));
     const allowed = ['get_issue', 'list_files', 'search_code', 'read_file', 'get_commits', 'get_file_diff'];
     return { caseId: test.id, category: test.category, durationMs: Math.round(performance.now() - started),
-      status: run.status, errorCode: run.errorCode, usage: run.usage, citationsValid,
+      model: run.model, status: run.status, errorCode: run.errorCode, usage: run.usage, citationsValid,
       forbiddenToolCalls: tools.filter(name => !allowed.includes(name)), tools, report: run.report,
       rubric: { rootCause: test.rootCause, supportingFile: test.path, supportingLines: [1, test.source.split('\n').length], fix: test.fix, verification: test.verification } };
   } finally { service.close(); }
@@ -47,8 +48,9 @@ async function main() {
   const budgetUsd = budgetIndex >= 0 ? Number(args[budgetIndex + 1]) : 0.1;
   if (!Number.isFinite(budgetUsd) || budgetUsd <= 0 || budgetUsd > 1) throw new Error('--max-usd must be > 0 and <= 1.');
   if (live) config({ path: fileURLToPath(new URL('../../../../.env.local', import.meta.url)), quiet: true });
-  const key = live ? process.env.OPENAI_API_KEY : undefined;
-  if (live && !key) throw new Error('Live evaluation requires the existing server OPENAI_API_KEY.');
+  const provider = live ? providerConfig() : OPENAI;
+  const key = live ? process.env[provider.keyVariable] : undefined;
+  if (live && !key) throw new Error('Live evaluation requires the selected provider’s server API key.');
   const directory = fileURLToPath(new URL('../../../../data/evals/', import.meta.url));
   mkdirSync(directory, { recursive: true });
   const runId = randomUUID();
@@ -56,9 +58,9 @@ async function main() {
   let blocked: string | null = null;
   for (const test of selected) {
     try {
-      const result = await runCase(test, { key, budgetUsd, ledgerPath: live ? `${directory}live-budget.sqlite` : undefined });
+      const result = await runCase(test, { key, provider, budgetUsd, ledgerPath: live ? `${directory}live-budget.sqlite` : undefined });
       results.push(result);
-      if (live && ['OPENAI_QUOTA', 'OPENAI_AUTHENTICATION', 'OPENAI_ACCESS', 'BUDGET_EXCEEDED'].includes(result.errorCode ?? '')) { blocked = result.errorCode; break; }
+      if (live && (result.status === 'budget_exceeded' || ['OPENAI_QUOTA', 'OPENAI_AUTHENTICATION', 'OPENAI_ACCESS', 'GEMINI_AUTHENTICATION', 'GEMINI_ACCESS', 'GEMINI_RATE_LIMIT', 'GEMINI_QUOTA', 'BUDGET_EXCEEDED'].includes(result.errorCode ?? ''))) { blocked = result.errorCode; break; }
     } catch { blocked = 'EVALUATION_STOPPED_OR_LEDGER_BUDGET_EXCEEDED'; break; }
   }
   const completed = results.filter(result => result.status === 'completed');

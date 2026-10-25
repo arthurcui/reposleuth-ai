@@ -91,13 +91,13 @@ describe('investigation lifecycle and API', () => {
 
   it('persists budget exhaustion without making a model call', async () => {
     const model = new ScriptedModel(); const service = make(() => model, { costUsd: 0.000001 });
-    expect(await finish(service, service.start(request).id)).toMatchObject({ status: 'budget_exceeded', errorCode: 'BUDGET_EXCEEDED' });
+    expect(await finish(service, service.start(request).id)).toMatchObject({ status: 'budget_exceeded', errorCode: 'BUDGET_EXCEEDED_COST' });
     expect(model.requests).toHaveLength(0);
   });
 
   it('records tool-budget exhaustion as a budget terminal state', async () => {
     const service = make(() => new ScriptedModel(), { tools: 1 });
-    expect(await finish(service, service.start(request).id)).toMatchObject({ status: 'budget_exceeded', errorCode: 'BUDGET_EXCEEDED' });
+    expect(await finish(service, service.start(request).id)).toMatchObject({ status: 'budget_exceeded', errorCode: 'BUDGET_EXCEEDED_TOOLS' });
   });
 
   it('terminates a stalled model on timeout and preserves unknown usage', async () => {

@@ -13,7 +13,12 @@ export const eventSchema = z.object({ id: z.number(), investigationId: z.string(
 export const isActive = (status: string) => status === 'queued' || status === 'running';
 export function errorMessage(code: string): string {
   const messages: Record<string, string> = {
-    AGENT_NOT_CONFIGURED: 'Configure OPENAI_API_KEY on the local API server, then restart it.',
+    AGENT_NOT_CONFIGURED: 'Configure LLM_PROVIDER and its server API key (OPENAI_API_KEY or GEMINI_API_KEY), then restart it.',
+    GEMINI_AUTHENTICATION: 'The server’s Gemini API key was rejected. Check its configuration.',
+    GEMINI_ACCESS: 'The configured Gemini model is unavailable to this project.',
+    GEMINI_RATE_LIMIT: 'Gemini quota or rate limit reached. Check Google AI Studio usage before retrying.',
+    GEMINI_QUOTA: 'Gemini API quota is exhausted. Check Google AI Studio usage.',
+    GEMINI_INVALID_REQUEST: 'Gemini rejected the model request. Check server compatibility.',
     OPENAI_QUOTA: 'OpenAI API credits are exhausted. Add credits or explore the free demo.',
     OPENAI_AUTHENTICATION: 'The server’s OpenAI API key was rejected. Check its local configuration.',
     OPENAI_ACCESS: 'The configured OpenAI model is unavailable to this project.',
@@ -22,6 +27,11 @@ export function errorMessage(code: string): string {
     SERVICE_STOPPED: 'The API stopped before this investigation finished.',
     INVALID_EVIDENCE: 'Source references could not be validated. No report was published.',
     BUDGET_EXCEEDED: 'The investigation stopped at its configured budget limit.',
+    BUDGET_EXCEEDED_REQUESTS: 'The model request limit was reached. Narrow the investigation to a specific issue or symptom.',
+    BUDGET_EXCEEDED_CONTEXT: 'The next request exceeded the conservative context allowance. Narrow the investigation scope.',
+    BUDGET_EXCEEDED_TOKENS: 'The token allowance was reached, including the conservative estimate for the next request. Displayed tokens count only completed requests.',
+    BUDGET_EXCEEDED_COST: 'The cost allowance was reached, including the reservation for the next request. Displayed cost counts reported usage only.',
+    BUDGET_EXCEEDED_TOOLS: 'The repository tool-call limit was reached. Narrow the investigation to a specific issue or symptom.',
     NOT_FOUND: 'This investigation or GitHub resource was not found.',
     ISSUE_NOT_FOUND: 'The requested GitHub issue was not found or is inaccessible. Check the issue number and repository. No model request was made.',
     QUEUE_FULL: 'The investigation queue is full. Wait for a run to finish.',

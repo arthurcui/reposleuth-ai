@@ -8,7 +8,7 @@ export function createTools(repository: RepositoryProvider, reads: SourceFile[],
   let calls = 0;
   async function invoke(name: string, action: () => Promise<unknown>) {
     check();
-    if (++calls > maxTools) throw new StopError('BUDGET_EXCEEDED');
+    if (++calls > maxTools) throw new StopError('BUDGET_EXCEEDED_TOOLS');
     emit('tool_started', { name, call: calls });
     try {
       const value = await action();

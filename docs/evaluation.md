@@ -30,6 +30,10 @@ Failures produce a nonzero exit status. CI uploads only the replay summary file.
 ## Optional live evaluation (uses API credits)
 
 Reuse the configured local backend key. Neither CI nor normal tests runs this.
+`LLM_PROVIDER=gemini` selects Gemini using `GEMINI_API_KEY`; the default is OpenAI
+using `OPENAI_API_KEY`. Each result records its selected model. Transport tests
+exercise Gemini tool calls, structured reports, usage, and HTTP failures with
+mock responses; they do not establish live model accuracy or account access.
 Start with one case:
 
 ```sh

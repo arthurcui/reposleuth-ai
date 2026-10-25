@@ -19,6 +19,6 @@ describe('API response errors', () => {
   });
   it('preserves structured API errors', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'AGENT_NOT_CONFIGURED' }, { status: 503 })));
-    await expect(api('')).rejects.toThrow('Configure OPENAI_API_KEY on the local API server');
+    await expect(api('')).rejects.toThrow('Configure LLM_PROVIDER and its server API key');
   });
 });
