@@ -62,8 +62,11 @@ Google's account rules. [Gemini pricing](https://ai.google.dev/gemini-api/docs/p
 npm run check
 ```
 
-This runs TypeScript checks, ESLint, Vitest API and React interaction tests, and
+This runs formatting checks, TypeScript checks, ESLint, Vitest API and React interaction tests, and
 production builds. Tests need no external APIs or paid calls.
+
+See [code structure and testing](docs/code-structure.md) for the directory layout,
+test placement, file-comment conventions, and focused verification commands.
 
 ## Investigation workspace
 

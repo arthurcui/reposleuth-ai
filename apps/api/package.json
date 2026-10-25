@@ -7,11 +7,11 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsup src/server.ts --format esm --platform node --target node22 --clean",
     "start": "node dist/server.js",
-    "inspect": "tsx src/github/inspect.ts",
-    "smoke:agent": "tsx src/agents/smoke.ts",
-    "eval": "tsx src/evals/runner.ts",
-    "eval:review": "tsx src/evals/review.ts",
-    "benchmark": "tsx src/benchmarks/runner.ts"
+    "inspect": "tsx cli/inspect.ts",
+    "smoke:agent": "tsx evaluation/smoke.ts",
+    "eval": "tsx evaluation/replay/runner.ts",
+    "eval:review": "tsx evaluation/replay/review.ts",
+    "benchmark": "tsx evaluation/benchmarks/runner.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.7",

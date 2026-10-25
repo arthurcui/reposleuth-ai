@@ -1,3 +1,4 @@
+/** Defines the repository read interface, result types, and domain errors. */
 export interface RepositoryRevision {
   repository: string;
   commitSha: string;
@@ -9,7 +10,10 @@ export interface BoundedResult<T> extends RepositoryRevision {
   warnings: string[];
 }
 
-export interface SourceLine { line: number; text: string }
+export interface SourceLine {
+  line: number;
+  text: string;
+}
 export interface SourceFile extends RepositoryRevision {
   path: string;
   startLine: number;
@@ -17,8 +21,16 @@ export interface SourceFile extends RepositoryRevision {
   totalLines: number;
   lines: SourceLine[];
 }
-export interface CodeMatch { path: string; line: number; snippet: string; snippetTruncated: boolean }
-export interface CommitSummary { sha: string; message: string }
+export interface CodeMatch {
+  path: string;
+  line: number;
+  snippet: string;
+  snippetTruncated: boolean;
+}
+export interface CommitSummary {
+  sha: string;
+  message: string;
+}
 export interface IssueDetails extends RepositoryRevision {
   number: number;
   title: string;
@@ -52,5 +64,11 @@ export interface RepositoryProvider {
 }
 
 export class RepositoryError extends Error {
-  constructor(public readonly code: string, message: string) { super(message); this.name = 'RepositoryError'; }
+  constructor(
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'RepositoryError';
+  }
 }
