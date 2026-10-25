@@ -2,7 +2,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Investigation, InvestigationEvent } from '@reposleuth/shared';
+import type { Investigation, InvestigationEvent, HistoryQuery } from '@reposleuth/shared';
+import { initializeHistory, listHistory } from './history.js';
 import { StopError } from '../agents/budget.js';
 
 export class InvestigationStore {
@@ -16,6 +17,10 @@ export class InvestigationStore {
       CREATE INDEX IF NOT EXISTS events_run ON events(investigation_id, id);
       CREATE TABLE IF NOT EXISTS budget (id INTEGER PRIMARY KEY CHECK(id=1), reserved REAL NOT NULL);
       INSERT OR IGNORE INTO budget VALUES (1, 0);`);
+    initializeHistory(this.db);
+  }
+  list(query: HistoryQuery) {
+    return listHistory(this.db, query);
   }
   save(value: Investigation) {
     this.db

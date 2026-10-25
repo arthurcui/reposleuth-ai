@@ -42,6 +42,10 @@ export const eventSchema = z.object({
 export const isActive = (status: string) => status === 'queued' || status === 'running';
 export function errorMessage(code: string): string {
   const messages: Record<string, string> = {
+    INVALID_HISTORY_QUERY: 'Check your history filters and use a positive whole issue number.',
+    INVALID_REPOSITORY: 'Enter a public GitHub repository URL or owner/repository.',
+    HISTORY_UNAVAILABLE: 'Investigation history is unavailable on this API server.',
+    REPORT_NOT_AVAILABLE: 'This investigation has no validated report to export.',
     AGENT_NOT_CONFIGURED:
       'Configure LLM_PROVIDER and its server API key (OPENAI_API_KEY or GEMINI_API_KEY), then restart it.',
     GEMINI_AUTHENTICATION: 'The server’s Gemini API key was rejected. Check its configuration.',
