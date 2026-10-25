@@ -18,7 +18,8 @@
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm test && npm run build",
     "eval": "npm run eval -w @reposleuth/api --",
-    "smoke:deployment": "node scripts/smoke-deployment.mjs"
+    "smoke:deployment": "node scripts/smoke-deployment.mjs",
+    "benchmark": "npm run benchmark -w @reposleuth/api --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

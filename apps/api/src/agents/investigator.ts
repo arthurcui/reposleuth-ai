@@ -6,7 +6,7 @@ import { BudgetModel, StopError, type RunLimits } from './budget.js';
 import { createTools } from './tools.js';
 import { OPENAI, type ProviderConfig } from './provider.js';
 import { instructions } from './instructions.js';
-import { validateEvidence } from '../services/evidenceValidator.js';
+import { validateEvidence, EvidenceValidationError } from '../services/evidenceValidator.js';
 
 export function liveModel(apiKey: string, config: ProviderConfig = OPENAI): Model {
   const client = new OpenAI({ apiKey, baseURL: config.provider === 'gemini'
@@ -47,5 +47,9 @@ export async function investigate(options: {
   const result = await runner.run(agent, JSON.stringify({ ...request, pinnedRevision: repository.revision }), { maxTurns: limits.turns, signal });
   check();
   emit('validating', {});
-  return validateEvidence(result.finalOutput, repository.revision, reads);
+  try { return validateEvidence(result.finalOutput, repository.revision, reads); }
+  catch (error) {
+    if (error instanceof EvidenceValidationError) emit('validation_failed', { reason: error.reason, evidenceIndex: error.evidenceIndex ?? null });
+    throw error;
+  }
 }

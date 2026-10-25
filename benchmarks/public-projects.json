@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "case-01",
+      "repository": "arthurcui/reposleuth-bench-node-api",
+      "issueNumber": 1,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-node-api/issues/1",
+      "title": "First ticket page omits the earliest records",
+      "commitSha": "ce93b1c8fd7955a8e5b2637a182775fa4908f877"
+    },
+    {
+      "id": "case-02",
+      "repository": "arthurcui/reposleuth-bench-node-api",
+      "issueNumber": 2,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-node-api/issues/2",
+      "title": "Dashboard shows another workspace’s tickets after switching",
+      "commitSha": "ce93b1c8fd7955a8e5b2637a182775fa4908f877"
+    },
+    {
+      "id": "case-03",
+      "repository": "arthurcui/reposleuth-bench-node-api",
+      "issueNumber": 3,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-node-api/issues/3",
+      "title": "Import reports completion before new tickets are visible",
+      "commitSha": "ce93b1c8fd7955a8e5b2637a182775fa4908f877"
+    },
+    {
+      "id": "case-04",
+      "repository": "arthurcui/reposleuth-bench-node-api",
+      "issueNumber": 4,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-node-api/issues/4",
+      "title": "Two accepted credit purchases leave an unexpected balance",
+      "commitSha": "ce93b1c8fd7955a8e5b2637a182775fa4908f877"
+    },
+    {
+      "id": "case-05",
+      "repository": "arthurcui/reposleuth-bench-node-api",
+      "issueNumber": 5,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-node-api/issues/5",
+      "title": "Priority zero includes tickets from other priorities",
+      "commitSha": "ce93b1c8fd7955a8e5b2637a182775fa4908f877"
+    },
+    {
+      "id": "case-06",
+      "repository": "arthurcui/reposleuth-bench-dotnet",
+      "issueNumber": 1,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-dotnet/issues/1",
+      "title": "Date-range export omits bookings on the final day",
+      "commitSha": "ecc63c120e05c73ad01549bef763fc050327fc7c"
+    },
+    {
+      "id": "case-07",
+      "repository": "arthurcui/reposleuth-bench-dotnet",
+      "issueNumber": 2,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-dotnet/issues/2",
+      "title": "Searching notes fails on a fresh database",
+      "commitSha": "ecc63c120e05c73ad01549bef763fc050327fc7c"
+    },
+    {
+      "id": "case-08",
+      "repository": "arthurcui/reposleuth-bench-dotnet",
+      "issueNumber": 3,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-dotnet/issues/3",
+      "title": "A ten-percent discount does not change the quote",
+      "commitSha": "ecc63c120e05c73ad01549bef763fc050327fc7c"
+    },
+    {
+      "id": "case-09",
+      "repository": "arthurcui/reposleuth-bench-dotnet",
+      "issueNumber": 4,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-dotnet/issues/4",
+      "title": "Bulk confirmation reports zero despite changing bookings",
+      "commitSha": "ecc63c120e05c73ad01549bef763fc050327fc7c"
+    },
+    {
+      "id": "case-10",
+      "repository": "arthurcui/reposleuth-bench-dotnet",
+      "issueNumber": 5,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-dotnet/issues/5",
+      "title": "Booking count stays unchanged after adding a booking",
+      "commitSha": "ecc63c120e05c73ad01549bef763fc050327fc7c"
+    },
+    {
+      "id": "case-11",
+      "repository": "arthurcui/reposleuth-bench-react",
+      "issueNumber": 1,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-react/issues/1",
+      "title": "Session timer stops advancing after one second",
+      "commitSha": "fbd5222d4a9944377f74ef47ade9bc13be2e0990"
+    },
+    {
+      "id": "case-12",
+      "repository": "arthurcui/reposleuth-bench-react",
+      "issueNumber": 2,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-react/issues/2",
+      "title": "Customer detail disagrees with the selected customer",
+      "commitSha": "fbd5222d4a9944377f74ef47ade9bc13be2e0990"
+    },
+    {
+      "id": "case-13",
+      "repository": "arthurcui/reposleuth-bench-react",
+      "issueNumber": 3,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-react/issues/3",
+      "title": "A task note moves to another task after reversing the list",
+      "commitSha": "fbd5222d4a9944377f74ef47ade9bc13be2e0990"
+    },
+    {
+      "id": "case-14",
+      "repository": "arthurcui/reposleuth-bench-react",
+      "issueNumber": 4,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-react/issues/4",
+      "title": "Seat total remains unchanged after adding seats",
+      "commitSha": "fbd5222d4a9944377f74ef47ade9bc13be2e0990"
+    },
+    {
+      "id": "case-15",
+      "repository": "arthurcui/reposleuth-bench-react",
+      "issueNumber": 5,
+      "issueUrl": "https://github.com/arthurcui/reposleuth-bench-react/issues/5",
+      "title": "Team filter shows an empty queue although tasks exist",
+      "commitSha": "fbd5222d4a9944377f74ef47ade9bc13be2e0990"
+    }
+  ]
+}

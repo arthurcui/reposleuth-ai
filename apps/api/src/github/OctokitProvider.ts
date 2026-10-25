@@ -19,14 +19,16 @@ export class OctokitProvider implements RepositoryProvider {
     this.revision = Object.freeze({ repository: `${owner}/${repo}`, commitSha: sha });
   }
 
-  static async connect(repository: string, options: { token?: string; client?: Octokit } = {}): Promise<OctokitProvider> {
+  static async connect(repository: string, options: { token?: string; client?: Octokit; commitSha?: string } = {}): Promise<OctokitProvider> {
     const { owner, repo } = parseRepository(repository);
+    if (options.commitSha !== undefined && !shaPattern.test(options.commitSha)) throw new RepositoryError('INVALID_REVISION', 'Expected a full commit SHA.');
     const client = options.client ?? new Octokit({ auth: options.token, request: { timeout: 15000, redirect: 'error' } });
     // No caller-supplied host or remote URL is ever sent to Octokit.
     try {
       const { data: metadata } = await client.rest.repos.get({ owner, repo });
       if (metadata.private !== false || (metadata.visibility && metadata.visibility !== 'public')) throw new RepositoryError('PRIVATE_REPOSITORY', 'Only public repositories are supported.');
-      const { data: commit } = await client.rest.repos.getCommit({ owner, repo, ref: metadata.default_branch, per_page: 1 });
+      const { data: commit } = await client.rest.repos.getCommit({ owner, repo, ref: options.commitSha ?? metadata.default_branch, per_page: 1 });
+      if (options.commitSha && commit.sha.toLowerCase() !== options.commitSha.toLowerCase()) throw new RepositoryError('INVALID_REVISION', 'Returned commit did not match the requested revision.');
       if (!shaPattern.test(commit.sha) || !shaPattern.test(commit.commit.tree.sha)) throw new RepositoryError('INVALID_REVISION', 'GitHub did not return a valid commit and tree.');
       return new OctokitProvider(client, owner, repo, commit.sha, commit.commit.tree.sha);
     } catch (error) { throw safeError(error); }

@@ -7,6 +7,18 @@ import { validateEvidence } from '../services/evidenceValidator.js';
 import { fakeRepository, validReport, ScriptedModel } from '../tests/agentFixtures.js';
 
 describe('SDK investigation loop', () => {
+  it('records a safe validation reason while rejecting the report without retrying', async () => {
+    const report = validReport(); report.evidence[0]!.quote = 'untrusted rejected text';
+    const model = new ScriptedModel(report);
+    const diagnostics: Record<string, unknown>[] = [];
+    await expect(investigate({ repository: fakeRepository(), request: {repository:'owner/repo',question:'Investigate the query'},
+      model, limits: DEFAULT_LIMITS, usage: emptyUsage(), signal: new AbortController().signal,
+      reserve: () => {}, saveUsage: () => {}, emit: (type,data) => { if(type === 'validation_failed') diagnostics.push(data); },
+    })).rejects.toMatchObject({code:'INVALID_EVIDENCE',reason:'QUOTE_MISMATCH'});
+    expect(diagnostics).toEqual([{reason:'QUOTE_MISMATCH',evidenceIndex:1}]);
+    expect(JSON.stringify(diagnostics)).not.toContain('untrusted rejected text');
+    expect(model.requests).toHaveLength(4);
+  });
   it('selects tools iteratively, returns validated evidence, aggregates usage, and emits safe steps', async () => {
     const model = new ScriptedModel();
     const usage = emptyUsage();

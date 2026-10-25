@@ -10,7 +10,8 @@
     "inspect": "tsx src/github/inspect.ts",
     "smoke:agent": "tsx src/agents/smoke.ts",
     "eval": "tsx src/evals/runner.ts",
-    "eval:review": "tsx src/evals/review.ts"
+    "eval:review": "tsx src/evals/review.ts",
+    "benchmark": "tsx src/benchmarks/runner.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.7",
