@@ -1,6 +1,6 @@
 /** Builds and searches a bounded source index while filtering unsafe or unsupported paths. */
 /* eslint-disable no-control-regex -- Deliberate rejection of control characters in untrusted inputs. */
-import { RepositoryError, type CodeMatch } from './RepositoryProvider.js';
+import { type CodeMatch, RepositoryError } from './RepositoryProvider.js';
 
 export const LIMITS = Object.freeze({
   files: 5000,

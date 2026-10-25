@@ -1,57 +1,18 @@
 /** Runs the tool-using investigation with the selected model and validates its final evidence. */
+import { Agent, type Model, Runner } from '@openai/agents';
 import {
-  Agent,
-  Runner,
-  OpenAIResponsesModel,
-  OpenAIChatCompletionsModel,
-  type Model,
-} from '@openai/agents';
-import OpenAI from 'openai';
-import {
-  reportSchema,
   type InvestigationRequest,
   type InvestigationUsage,
+  reportSchema,
 } from '@reposleuth/shared';
-import type { RepositoryProvider, SourceFile } from '../github/RepositoryProvider.js';
-import { BudgetModel, StopError, type RunLimits } from './budget.js';
-import { createTools } from './tools.js';
-import { OPENAI, type ProviderConfig } from './provider.js';
-import { instructions } from './instructions.js';
-import { validateEvidence, EvidenceValidationError } from '../services/evidenceValidator.js';
 
-export function liveModel(apiKey: string, config: ProviderConfig = OPENAI): Model {
-  const client = new OpenAI({
-    apiKey,
-    baseURL:
-      config.provider === 'gemini'
-        ? 'https://generativelanguage.googleapis.com/v1beta/openai/'
-        : 'https://api.openai.com/v1',
-    maxRetries: 0,
-    timeout: 30000,
-  });
-  if (config.provider !== 'gemini') return new OpenAIResponsesModel(client, config.model);
-  const delegate = new OpenAIChatCompletionsModel(client, config.model);
-  return {
-    getResponse: (request) =>
-      delegate.getResponse({
-        ...request,
-        // Use JSON-object mode with function tools; the strict JSON-schema request
-        // is rejected by Gemini. The SDK still validates the final report schema.
-        systemInstructions: `${request.systemInstructions ?? ''}\nWhen finished, return only JSON matching this schema:\n${JSON.stringify(request.outputType)}`,
-        outputType: 'text',
-        modelSettings: {
-          ...request.modelSettings,
-          providerData: {
-            ...request.modelSettings.providerData,
-            response_format: { type: 'json_object' },
-          },
-        },
-      }),
-    getStreamedResponse: () => {
-      throw new StopError('STREAMING_MODEL_DISABLED');
-    },
-  };
-}
+import type { RepositoryProvider, SourceFile } from '../github/RepositoryProvider.js';
+import { EvidenceValidationError, validateEvidence } from '../services/evidenceValidator.js';
+import { BudgetModel, type RunLimits, StopError } from './budget.js';
+import { instructions } from './instructions.js';
+import { investigationModelSettings } from './models/settings.js';
+import { type ProviderConfig } from './provider.js';
+import { createTools } from './tools.js';
 
 export async function investigate(options: {
   provider?: ProviderConfig;
@@ -85,17 +46,10 @@ export async function investigate(options: {
     name: 'Engineering Investigator',
     instructions,
     model,
-    modelSettings: {
-      store: false,
-      parallelToolCalls: false,
-      maxTokens: limits.outputTokens,
-      reasoning: { effort: options.provider?.provider === 'gemini' ? 'minimal' : 'low' },
-      retry: { maxRetries: 0 },
-      providerData:
-        options.provider?.provider === 'gemini'
-          ? { store: undefined }
-          : { service_tier: 'default' },
-    },
+    modelSettings: investigationModelSettings(
+      options.provider?.provider ?? 'openai',
+      limits.outputTokens,
+    ),
     tools: createTools(repository, reads, check, emit, limits.tools),
     outputType: reportSchema,
   });

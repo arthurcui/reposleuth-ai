@@ -1,7 +1,8 @@
 /** Checks report citations against retrieved source so unsupported evidence is rejected. */
-import { reportSchema, type InvestigationReport } from '@reposleuth/shared';
-import type { RepositoryRevision, SourceFile } from '../github/RepositoryProvider.js';
+import { type InvestigationReport, reportSchema } from '@reposleuth/shared';
+
 import { StopError } from '../agents/budget.js';
+import type { RepositoryRevision, SourceFile } from '../github/RepositoryProvider.js';
 
 export type EvidenceFailure =
   | 'DUPLICATE_ID'

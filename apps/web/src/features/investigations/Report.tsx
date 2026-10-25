@@ -1,7 +1,8 @@
 /** Renders findings, cited evidence, proposed fixes, and uncertainty for an investigation. */
 import type { Investigation } from '@reposleuth/shared';
-import { sourceUrl } from './client';
+
 import { demoDetails } from '../demo/demoDetails';
+import { sourceUrl } from './client';
 
 export function Report({ run }: { run: Investigation }) {
   const report = run.report;

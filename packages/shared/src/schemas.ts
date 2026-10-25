@@ -43,6 +43,10 @@ export const investigationRequestSchema = z
     repository: z.string().trim().min(3).max(250),
     issueNumber: z.number().int().positive().optional(),
     question: z.string().trim().min(5).max(2000),
+    modelSelection: z
+      .object({ provider: z.enum(['openai', 'gemini']), model: z.string().min(1).max(150) })
+      .strict()
+      .optional(),
   })
   .strict();
 export type InvestigationRequest = z.infer<typeof investigationRequestSchema>;
@@ -65,6 +69,7 @@ export interface InvestigationUsage {
   usageIncomplete: boolean;
 }
 export interface Investigation {
+  provider?: 'openai' | 'gemini';
   id: string;
   request: InvestigationRequest;
   status: InvestigationStatus;
@@ -78,6 +83,22 @@ export interface Investigation {
   usage: InvestigationUsage;
   model: string;
 }
+
+export const modelCatalogSchema = z.object({
+  models: z.array(
+    z.object({
+      provider: z.enum(['openai', 'gemini']),
+      model: z.string(),
+      selectable: z.boolean(),
+      reason: z.string().nullable(),
+      inputPerMillion: z.number().nullable(),
+      outputPerMillion: z.number().nullable(),
+    }),
+  ),
+  errors: z.array(z.object({ provider: z.enum(['openai', 'gemini']), message: z.string() })),
+  defaultSelection: z.object({ provider: z.enum(['openai', 'gemini']), model: z.string() }),
+});
+export type ModelCatalog = z.infer<typeof modelCatalogSchema>;
 export interface InvestigationEvent {
   id: number;
   investigationId: string;

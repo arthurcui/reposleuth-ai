@@ -1,23 +1,26 @@
 /** Coordinates investigation execution, cancellation, persistence, events, and budgets. */
 import { randomUUID } from 'node:crypto';
-import { ToolCallError, type Model } from '@openai/agents';
+
+import { type Model, ToolCallError } from '@openai/agents';
 import type { Investigation, InvestigationRequest, InvestigationStatus } from '@reposleuth/shared';
+
+import { DEFAULT_LIMITS, emptyUsage, type RunLimits, StopError } from '../agents/budget.js';
+import { investigate } from '../agents/investigator.js';
+import { OPENAI, type ProviderConfig } from '../agents/provider.js';
 import type { RepositoryProvider } from '../github/RepositoryProvider.js';
 import { RepositoryError } from '../github/RepositoryProvider.js';
-import { DEFAULT_LIMITS, emptyUsage, StopError, type RunLimits } from '../agents/budget.js';
-import { OPENAI, type ProviderConfig } from '../agents/provider.js';
-import { investigate } from '../agents/investigator.js';
-import { InvestigationStore } from '../storage/sqlite.js';
+import { type InvestigationStore } from '../storage/sqlite.js';
 
 export class InvestigationService {
   private queue: string[] = [];
+  private selections = new Map<string, ProviderConfig>();
   private active?: { id: string; controller: AbortController };
   private closed = false;
   private readonly limits: RunLimits;
   constructor(
     readonly store: InvestigationStore,
     private readonly repository: (input: string) => Promise<RepositoryProvider>,
-    private readonly model: () => Model,
+    private readonly model: (provider: ProviderConfig) => Model,
     limits: Partial<RunLimits> = {},
     private readonly lifetimeBudgetUsd = 1,
     private readonly provider: ProviderConfig = OPENAI,
@@ -32,7 +35,7 @@ export class InvestigationService {
       store.append(record.id, 'terminal', { status: record.status, code: record.errorCode });
     }
   }
-  start(request: InvestigationRequest): Investigation {
+  start(request: InvestigationRequest, selected: ProviderConfig = this.provider): Investigation {
     if (this.closed) throw new StopError('SERVICE_STOPPED');
     if (this.queue.length + (this.active ? 1 : 0) >= 5) throw new StopError('QUEUE_FULL');
     if (this.store.reserved() >= this.lifetimeBudgetUsd) throw new StopError('BUDGET_EXCEEDED');
@@ -48,13 +51,15 @@ export class InvestigationService {
       report: null,
       errorCode: null,
       usage: emptyUsage(),
-      model: this.provider.model,
+      model: selected.model,
+      provider: selected.provider,
     };
     this.store.save(record);
+    this.selections.set(record.id, selected);
     this.store.append(record.id, 'queued', {});
     this.queue.push(record.id);
     setImmediate(() => {
-      void this.drain();
+      this.drain().catch(() => this.handleQueueFailure());
     });
     return record;
   }
@@ -64,6 +69,7 @@ export class InvestigationService {
     if (this.active?.id === id) this.active.controller.abort('CANCELLED');
     else {
       this.queue = this.queue.filter((item) => item !== id);
+      this.selections.delete(id);
       record.status = 'cancelled';
       record.finishedAt = new Date().toISOString();
       record.errorCode = 'CANCELLED';
@@ -76,12 +82,18 @@ export class InvestigationService {
     if (this.closed || this.active || !this.queue.length) return;
     const id = this.queue.shift()!;
     const record = this.store.get(id)!;
+    const selected = this.selections.get(id) ?? this.provider;
+    this.selections.delete(id);
     const controller = new AbortController();
     this.active = { id, controller };
     record.status = 'running';
     record.startedAt = new Date().toISOString();
     this.store.save(record);
-    this.store.append(id, 'started', { model: this.provider.model, limits: this.limits });
+    this.store.append(id, 'started', {
+      model: selected.model,
+      provider: selected.provider,
+      limits: this.limits,
+    });
     let terminal = false;
     const save = () => {
       if (!this.closed && !terminal) this.store.save(record);
@@ -127,10 +139,10 @@ export class InvestigationService {
           if (controller.signal.aborted || this.closed) throw new StopError('CANCELLED');
         }
         return investigate({
-          provider: this.provider,
+          provider: selected,
           repository,
           request: record.request,
-          model: this.model(),
+          model: this.model(selected),
           limits: this.limits,
           usage: record.usage,
           signal: controller.signal,
@@ -181,8 +193,17 @@ export class InvestigationService {
       this.active = undefined;
       if (!this.closed)
         setImmediate(() => {
-          void this.drain();
+          this.drain().catch(() => this.handleQueueFailure());
         });
+    }
+  }
+  private handleQueueFailure() {
+    // Stop accepting paid work after an unexpected persistence/queue failure.
+    console.error('Investigation queue stopped unexpectedly. Restart the API to recover.');
+    try {
+      this.close();
+    } catch {
+      this.closed = true;
     }
   }
   close() {

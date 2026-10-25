@@ -1,8 +1,9 @@
 /** Validates API responses and provides investigation requests, status helpers, and source links. */
-import { z } from 'zod';
 import { investigationRequestSchema, reportSchema } from '@reposleuth/shared';
+import { z } from 'zod';
 
 export const runSchema = z.object({
+  provider: z.enum(['openai', 'gemini']).optional(),
   id: z.string(),
   request: investigationRequestSchema,
   status: z.enum([
@@ -42,6 +43,9 @@ export const eventSchema = z.object({
 export const isActive = (status: string) => status === 'queued' || status === 'running';
 export function errorMessage(code: string): string {
   const messages: Record<string, string> = {
+    MODEL_UNAVAILABLE:
+      'This model is unavailable or not enabled for investigations. Load available models and choose an enabled model.',
+    MODEL_DISCOVERY_UNAVAILABLE: 'Model discovery is unavailable on this server.',
     INVALID_HISTORY_QUERY: 'Check your history filters and use a positive whole issue number.',
     INVALID_REPOSITORY: 'Enter a public GitHub repository URL or owner/repository.',
     HISTORY_UNAVAILABLE: 'Investigation history is unavailable on this API server.',

@@ -1,17 +1,19 @@
 /** Evaluates the fixed case corpus using scripted replay or explicitly requested live models. */
 import { randomUUID } from 'node:crypto';
-import { performance } from 'node:perf_hooks';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
-import { config } from 'dotenv';
+
 import type { Investigation } from '@reposleuth/shared';
-import { cases, type EvalCase } from './cases.js';
-import { fixtureRepository, ReplayModel } from './fixtures.js';
+import { config } from 'dotenv';
+
+import { liveModel } from '../../src/agents/models/createModel.js';
+import { OPENAI, type ProviderConfig, providerConfig } from '../../src/agents/provider.js';
+import { validateEvidence } from '../../src/services/evidenceValidator.js';
 import { InvestigationService } from '../../src/services/investigationService.js';
 import { InvestigationStore } from '../../src/storage/sqlite.js';
-import { providerConfig, OPENAI, type ProviderConfig } from '../../src/agents/provider.js';
-import { liveModel } from '../../src/agents/investigator.js';
-import { validateEvidence } from '../../src/services/evidenceValidator.js';
+import { cases, type EvalCase } from './cases.js';
+import { fixtureRepository, ReplayModel } from './fixtures.js';
 
 export async function runCase(
   test: EvalCase,

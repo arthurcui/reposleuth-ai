@@ -1,8 +1,10 @@
 /** Verifies production static serving and API routing in an isolated application. */
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
 import { expect, it } from 'vitest';
+
 import { buildApp } from '../../../src/app.js';
 
 it('serves the built site with API isolation and local-origin protections', async () => {

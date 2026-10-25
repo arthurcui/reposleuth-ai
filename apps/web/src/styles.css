@@ -5,6 +5,16 @@
   background: #0b101a;
   font-synthesis: none;
 }
+.model-picker {
+  width: 100%;
+  min-width: 0;
+}
+.model-picker select {
+  width: 100%;
+  min-height: 52px;
+  font-size: 15px;
+  padding: 14px 12px;
+}
 .history-panel {
   margin-bottom: 28px;
 }
@@ -176,7 +186,7 @@ footer {
 }
 .workspace {
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }

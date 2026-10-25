@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 /** Verifies form interactions, demo navigation, reports, and reconnection behavior in jsdom. */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { App } from '../../src/App';
-import { demo } from '../../src/features/demo/demo';
-import { demoCases } from '../../src/features/demo/demo';
-import { Report } from '../../src/features/investigations/Report';
+import { demo, demoCases } from '../../src/features/demo/demo';
 import { sourceUrl } from '../../src/features/investigations/client';
+import { Report } from '../../src/features/investigations/Report';
+// Provider discovery interactions are covered independently in ModelPicker.test.tsx.
+vi.mock('../../src/features/investigations/ModelPicker', () => ({ ModelPicker: () => null }));
 
 class Stream extends EventTarget {
   static latest: Stream;
@@ -144,7 +146,9 @@ describe('investigation UI', () => {
     vi.stubGlobal('fetch', fetch);
     history.replaceState(null, '', '/?investigation=demo');
     const view = render(<App />);
-    expect(screen.getAllByRole('option')).toHaveLength(20);
+    expect(
+      (screen.getByLabelText('Explore the 20 defect cases') as HTMLSelectElement).options,
+    ).toHaveLength(20);
     expect(
       (screen.getByRole('button', { name: 'Previous demo case' }) as HTMLButtonElement).disabled,
     ).toBe(true);

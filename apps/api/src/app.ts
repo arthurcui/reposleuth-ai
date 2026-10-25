@@ -1,14 +1,16 @@
 /** Creates the Fastify application, registers API routes, and serves the built web UI. */
-import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { healthSchema } from '@reposleuth/shared';
+import Fastify from 'fastify';
+
+import type { ModelCatalogService } from './agents/modelCatalog.js';
 import { registerInvestigations } from './routes/investigations.js';
 import type { InvestigationService } from './services/investigationService.js';
 import type { InvestigationStore } from './storage/sqlite.js';
 
 export function buildApp(
   service?: InvestigationService,
-  options: { webRoot?: string; store?: InvestigationStore } = {},
+  options: { webRoot?: string; store?: InvestigationStore; catalog?: ModelCatalogService } = {},
 ) {
   const app = Fastify({ logger: false, bodyLimit: 16384 });
   app.addHook('onRequest', async (req, reply) => {
@@ -32,7 +34,7 @@ export function buildApp(
     }
     reply.header('Cache-Control', 'no-store');
   });
-  registerInvestigations(app, service, options.store);
+  registerInvestigations(app, service, options.store, options.catalog);
   if (options.webRoot) {
     void app.register(fastifyStatic, {
       root: options.webRoot,

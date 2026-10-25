@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 /** Verifies history filters, pagination, reopening, downloads, and loading/error recovery. */
-import { afterEach, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { InvestigationHistory } from '../../src/features/history/InvestigationHistory';
 import type { HistoryPage } from '@reposleuth/shared';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+
+import { InvestigationHistory } from '../../src/features/history/InvestigationHistory';
 
 const page: HistoryPage = {
   total: 21,

@@ -1,6 +1,7 @@
 /** Creates saved investigation records for history, migration, and export tests. */
 import type { Investigation } from '@reposleuth/shared';
-import { validReport, SHA } from './agentFixtures.js';
+
+import { SHA, validReport } from './agentFixtures.js';
 
 export function savedInvestigation(overrides: Partial<Investigation> = {}): Investigation {
   return {

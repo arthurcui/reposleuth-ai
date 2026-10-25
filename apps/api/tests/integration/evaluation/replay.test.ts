@@ -1,8 +1,9 @@
 /** Verifies deterministic evaluation results across the synthetic defect corpus. */
 import { describe, expect, it } from 'vitest';
+
 import { cases } from '../../../evaluation/replay/cases.js';
-import { runCase } from '../../../evaluation/replay/runner.js';
 import { expectedReport, fixtureRepository } from '../../../evaluation/replay/fixtures.js';
+import { runCase } from '../../../evaluation/replay/runner.js';
 import { validateEvidence } from '../../../src/services/evidenceValidator.js';
 
 describe('curated evaluation corpus (scripted replay, not model accuracy)', () => {

@@ -1,5 +1,6 @@
 /** Verifies complete Markdown reports and safe handling of embedded source and markup. */
 import { expect, it } from 'vitest';
+
 import { exportMarkdown } from '../../../src/services/markdownExport.js';
 import { savedInvestigation } from '../../fixtures/savedInvestigation.js';
 

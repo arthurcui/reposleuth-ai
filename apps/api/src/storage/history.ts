@@ -1,6 +1,7 @@
 /** Migrates and queries the SQLite full-text index for this server's saved investigations. */
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
-import type { HistoryQuery, HistoryPage, Investigation } from '@reposleuth/shared';
+
+import type { HistoryPage, HistoryQuery, Investigation } from '@reposleuth/shared';
 
 const columns = (body: string, id: string) => `${id},
   json_extract(${body}, '$.request.question'),

@@ -1,18 +1,25 @@
 /** Registers investigation lifecycle, report, source, and event-stream HTTP endpoints. */
+import { historyQuerySchema, investigationRequestSchema } from '@reposleuth/shared';
 import type { FastifyInstance } from 'fastify';
-import { investigationRequestSchema, historyQuerySchema } from '@reposleuth/shared';
-import { exportMarkdown } from '../services/markdownExport.js';
-import { parseRepository } from '../github/repositoryIndex.js';
+
 import { StopError } from '../agents/budget.js';
+import type { ModelCatalogService } from '../agents/modelCatalog.js';
+import { parseRepository } from '../github/repositoryIndex.js';
 import type { InvestigationService } from '../services/investigationService.js';
+import { exportMarkdown } from '../services/markdownExport.js';
 import type { InvestigationStore } from '../storage/sqlite.js';
 
 export function registerInvestigations(
   app: FastifyInstance,
   service?: InvestigationService,
   store: InvestigationStore | undefined = service?.store,
+  catalog?: ModelCatalogService,
 ) {
   const streams = new Set<() => void>();
+  app.get('/api/investigations/models', async (_req, reply) => {
+    if (!catalog) return reply.code(503).send({ error: 'MODEL_DISCOVERY_UNAVAILABLE' });
+    return catalog.list();
+  });
   app.addHook('preClose', async () => {
     for (const close of streams) close();
   });
@@ -56,7 +63,18 @@ export function registerInvestigations(
     }
     if (!service) return reply.code(503).send({ error: 'AGENT_NOT_CONFIGURED' });
     try {
-      const run = service.start(input.data);
+      let selected;
+      if (catalog) {
+        const selection = input.data.modelSelection ?? (await catalog.list()).defaultSelection;
+        try {
+          selected = await catalog.resolve(selection);
+        } catch {
+          return reply.code(400).send({ error: 'MODEL_UNAVAILABLE' });
+        }
+      } else if (input.data.modelSelection) {
+        return reply.code(400).send({ error: 'MODEL_UNAVAILABLE' });
+      }
+      const run = service.start(input.data, selected);
       return reply
         .code(202)
         .send({ id: run.id, status: run.status, repository: run.request.repository });

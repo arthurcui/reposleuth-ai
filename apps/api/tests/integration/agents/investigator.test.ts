@@ -1,11 +1,12 @@
 /** Verifies the agent tool loop, report validation, and failure handling using scripted responses. */
-import { describe, expect, it } from 'vitest';
-import { Usage, type Model, type ModelRequest, type ModelResponse } from '@openai/agents';
+import { type Model, type ModelRequest, type ModelResponse, Usage } from '@openai/agents';
 import type { InvestigationReport } from '@reposleuth/shared';
+import { describe, expect, it } from 'vitest';
+
+import { BudgetModel, DEFAULT_LIMITS, emptyUsage } from '../../../src/agents/budget.js';
 import { investigate } from '../../../src/agents/investigator.js';
-import { DEFAULT_LIMITS, BudgetModel, emptyUsage } from '../../../src/agents/budget.js';
 import { validateEvidence } from '../../../src/services/evidenceValidator.js';
-import { fakeRepository, validReport, ScriptedModel } from '../../fixtures/agentFixtures.js';
+import { fakeRepository, ScriptedModel, validReport } from '../../fixtures/agentFixtures.js';
 
 describe('SDK investigation loop', () => {
   it('records a safe validation reason while rejecting the report without retrying', async () => {
