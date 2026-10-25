@@ -1,10 +1,13 @@
 /** Persists investigations, events, and usage reservations in SQLite. */
-import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Investigation, InvestigationEvent, HistoryQuery } from '@reposleuth/shared';
-import { initializeHistory, listHistory } from './history.js';
+import { DatabaseSync } from 'node:sqlite';
+
+import type { HistoryQuery, Investigation, InvestigationEvent } from '@reposleuth/shared';
+import { z } from 'zod';
+
 import { StopError } from '../agents/budget.js';
+import { initializeHistory, listHistory } from './history.js';
 
 export class InvestigationStore {
   private readonly db: DatabaseSync;
@@ -57,7 +60,7 @@ export class InvestigationStore {
         investigationId: String(row.investigation_id),
         at: String(row.at),
         type: String(row.type),
-        data: JSON.parse(String(row.data)),
+        data: z.record(z.string(), z.unknown()).parse(JSON.parse(String(row.data))),
       }));
   }
   reserve(amount: number, ceiling: number) {

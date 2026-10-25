@@ -1,17 +1,19 @@
 /** Verifies public benchmark inputs or runs budgeted live investigations and saves results. */
-import { randomUUID, createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
+import type { Investigation } from '@reposleuth/shared';
 import { config } from 'dotenv';
 import { z } from 'zod';
+
+import { DEFAULT_LIMITS } from '../../src/agents/budget.js';
+import { liveModel } from '../../src/agents/models/createModel.js';
+import { OPENAI, providerConfig } from '../../src/agents/provider.js';
 import { OctokitProvider } from '../../src/github/OctokitProvider.js';
+import { RepositoryError, type RepositoryProvider } from '../../src/github/RepositoryProvider.js';
 import { InvestigationService } from '../../src/services/investigationService.js';
 import { InvestigationStore } from '../../src/storage/sqlite.js';
-import { providerConfig, OPENAI } from '../../src/agents/provider.js';
-import { RepositoryError, type RepositoryProvider } from '../../src/github/RepositoryProvider.js';
-import { liveModel } from '../../src/agents/investigator.js';
-import { DEFAULT_LIMITS } from '../../src/agents/budget.js';
-import type { Investigation } from '@reposleuth/shared';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 export const manifestSchema = z

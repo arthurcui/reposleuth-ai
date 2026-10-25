@@ -1,10 +1,12 @@
 /** Verifies legacy migration, full-text search, updates, filtering, and stable history pagination. */
-import { afterEach, describe, expect, it } from 'vitest';
-import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+
 import { historyQuerySchema } from '@reposleuth/shared';
+import { afterEach, describe, expect, it } from 'vitest';
+
 import { InvestigationStore } from '../../../src/storage/sqlite.js';
 import { savedInvestigation } from '../../fixtures/savedInvestigation.js';
 

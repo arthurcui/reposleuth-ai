@@ -1,5 +1,6 @@
 /** Verifies API parsing, error messages, and source-link helpers. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { api } from '../../src/features/investigations/client';
 
 afterEach(() => vi.unstubAllGlobals());

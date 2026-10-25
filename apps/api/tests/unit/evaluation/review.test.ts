@@ -1,7 +1,8 @@
 /** Verifies human review score validation and summaries. */
 import { expect, it } from 'vitest';
-import { gradeReview } from '../../../evaluation/replay/review.js';
+
 import { cases } from '../../../evaluation/replay/cases.js';
+import { gradeReview } from '../../../evaluation/replay/review.js';
 
 const result = {
   runId: 'test',

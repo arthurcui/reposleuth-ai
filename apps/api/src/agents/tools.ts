@@ -1,6 +1,7 @@
 /** Exposes bounded, read-only repository tools to the investigating model. */
 import { tool } from '@openai/agents';
 import { z } from 'zod';
+
 import {
   RepositoryError,
   type RepositoryProvider,

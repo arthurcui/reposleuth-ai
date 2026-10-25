@@ -1,6 +1,7 @@
 /** Lists, filters, and searches saved investigations, with report reopening and Markdown downloads. */
-import { useEffect, useState, type FormEvent } from 'react';
-import { historyPageSchema, investigationStatusSchema, type HistoryPage } from '@reposleuth/shared';
+import { type HistoryPage, historyPageSchema, investigationStatusSchema } from '@reposleuth/shared';
+import { type FormEvent, useEffect, useState } from 'react';
+
 import { api } from '../investigations/client';
 
 const emptyFilters = { q: '', repository: '', issueNumber: '', model: '', status: '' };
@@ -53,7 +54,9 @@ export function InvestigationHistory({
         if (!disposed) setLoading(false);
       }
     }
-    void load();
+    load().catch(() => {
+      if (!disposed) setError('Unable to load data. Please retry.');
+    });
     return () => {
       disposed = true;
     };

@@ -1,8 +1,9 @@
 /** Verifies exact source matching and rejection of unsupported report citations. */
+import type { InvestigationReport } from '@reposleuth/shared';
 import { expect, it } from 'vitest';
+
 import { validateEvidence } from '../../../src/services/evidenceValidator.js';
 import { fakeRepository, validReport } from '../../fixtures/agentFixtures.js';
-import type { InvestigationReport } from '@reposleuth/shared';
 
 it.each([
   [

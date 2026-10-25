@@ -1,24 +1,25 @@
 /** Reads public GitHub repositories and issues through Octokit at a pinned revision. */
 import { Octokit } from '@octokit/rest';
+
 import {
+  isSourcePath,
+  LIMITS,
+  parseRepository,
+  searchIndex,
+  splitSource,
+  validatePath,
+} from './repositoryIndex.js';
+import {
+  type BoundedResult,
+  type CodeMatch,
+  type CommitSummary,
+  type FileDiff,
+  type IssueDetails,
   RepositoryError,
   type RepositoryProvider,
   type RepositoryRevision,
-  type BoundedResult,
-  type CodeMatch,
   type SourceFile,
-  type IssueDetails,
-  type CommitSummary,
-  type FileDiff,
 } from './RepositoryProvider.js';
-import {
-  LIMITS,
-  parseRepository,
-  validatePath,
-  isSourcePath,
-  splitSource,
-  searchIndex,
-} from './repositoryIndex.js';
 
 interface TreeFile {
   path: string;

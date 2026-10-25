@@ -1,10 +1,12 @@
 /** Runs an explicitly opted-in live model smoke check against synthetic source. */
-import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
-import { InvestigationStore } from '../src/storage/sqlite.js';
-import { InvestigationService } from '../src/services/investigationService.js';
+
+import { config } from 'dotenv';
+
+import { liveModel } from '../src/agents/models/createModel.js';
 import { providerConfig } from '../src/agents/provider.js';
-import { liveModel } from '../src/agents/investigator.js';
+import { InvestigationService } from '../src/services/investigationService.js';
+import { InvestigationStore } from '../src/storage/sqlite.js';
 import { fakeRepository } from '../tests/fixtures/agentFixtures.js';
 import { SOURCE } from '../tests/fixtures/githubFixtures.js';
 

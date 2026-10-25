@@ -1,14 +1,16 @@
 /** Verifies investigation lifecycle, persistence, cancellation, events, and budget handling. */
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { RepositoryError } from '../../../src/github/RepositoryProvider.js';
-import type { Model } from '@openai/agents';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { InvestigationStore } from '../../../src/storage/sqlite.js';
-import { InvestigationService } from '../../../src/services/investigationService.js';
-import { fakeRepository, ScriptedModel, validReport } from '../../fixtures/agentFixtures.js';
+
+import type { Model } from '@openai/agents';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { buildApp } from '../../../src/app.js';
+import { RepositoryError } from '../../../src/github/RepositoryProvider.js';
+import { InvestigationService } from '../../../src/services/investigationService.js';
+import { InvestigationStore } from '../../../src/storage/sqlite.js';
+import { fakeRepository, ScriptedModel, validReport } from '../../fixtures/agentFixtures.js';
 
 const request = {
   repository: 'owner/repo',

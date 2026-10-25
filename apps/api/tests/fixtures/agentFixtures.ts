@@ -1,6 +1,7 @@
 /** Provides reusable reports, repository doubles, and scripted model responses for tests. */
-import { Usage, type Model, type ModelRequest, type ModelResponse } from '@openai/agents';
+import { type Model, type ModelRequest, type ModelResponse, Usage } from '@openai/agents';
 import type { InvestigationReport } from '@reposleuth/shared';
+
 import type { RepositoryProvider } from '../../src/github/RepositoryProvider.js';
 
 export const SHA = 'a'.repeat(40);

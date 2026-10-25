@@ -72,8 +72,11 @@ Health responses contain no configuration values or secrets.
 Set `LLM_PROVIDER=openai` (the default) with `OPENAI_API_KEY`, or set
 `LLM_PROVIDER=gemini` with `GEMINI_API_KEY` in the root `.env.local`, then restart
 the API. Gemini uses `gemini-3.5-flash-lite`; OpenAI keeps `gpt-6-luna`.
-Provider selection is server-wide and applies to new investigations, the live
-smoke command, and live evaluations. Saved reports keep their original model.
+`LLM_PROVIDER` sets the default provider. In the investigation form, choose
+the automatically loaded model dropdown, grouped under OpenAI or Google Gemini.
+Both providers are available when both server keys are configured. The selection
+applies to that investigation; saved reports keep their original provider and model.
+CLI smoke checks and evaluations continue to use the server default.
 There is no automatic fallback to another provider or key.
 
 Get a Gemini key from [Google AI Studio](https://aistudio.google.com/apikey) and
@@ -327,7 +330,25 @@ The default model is `gpt-6-luna` with low reasoning effort, standard processing
 remote tracing disabled, response storage disabled, and automatic model retries disabled.
 Public source excerpts and the investigation question are sent to the selected provider for inference.
 Gemini uses Flash-Lite with minimal thinking; remote tracing and automatic retries remain disabled.
-Each provider’s model is fixed in code so changing it requires reviewing its pricing and behavior.
+Model discovery lists models returned by configured provider accounts. Discovery
+does not establish tool compatibility or prices. Only models with a reviewed
+server profile can be selected; unknown models remain visible but disabled.
+The existing OpenAI and Gemini defaults have built-in profiles. To enable another
+discovered model, verify that it supports the current agent adapter (tool calls,
+structured report output, and reasoning settings) and add its standard token rates
+to `MODEL_PROFILES_JSON` in the server environment, then restart:
+
+```text
+MODEL_PROFILES_JSON=[{"provider":"openai","model":"YOUR_REVIEWED_MODEL_ID","inputPerMillion":1,"outputPerMillion":2}]
+```
+
+The numbers above are illustrative, not prices for any model. Profiles can override
+the default rates. Unlisted models, missing keys, and failed discovery are rejected
+before queueing; there is no silent model fallback. Lists are cached for five minutes
+(30 seconds after provider errors). Discovery uses metadata requests only, never
+paid inference probes. Keys and upstream error details remain on the server.
+See the [OpenAI model-list API](https://developers.openai.com/api/reference/resources/models/methods/list)
+and [Gemini model-list API](https://ai.google.dev/api/models#method:-models.list).
 
 Per run: 12 model requests, 24 tool calls, 100,000 total reported tokens, 2,000 output
 tokens per request, 80,000 estimated input tokens per request, a 120-second deadline,

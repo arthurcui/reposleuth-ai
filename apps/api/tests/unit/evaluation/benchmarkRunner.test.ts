@@ -1,14 +1,15 @@
 /** Verifies benchmark arguments, manifest validation, and repository verification behavior. */
 import { expect, it, vi } from 'vitest';
+
 import {
+  benchmarkError,
   manifestSchema,
   parseArguments,
   readManifest,
   verificationRepositories,
-  benchmarkError,
 } from '../../../evaluation/benchmarks/runner.js';
-import { fakeRepository } from '../../fixtures/agentFixtures.js';
 import { RepositoryError } from '../../../src/github/RepositoryProvider.js';
+import { fakeRepository } from '../../fixtures/agentFixtures.js';
 it('reuses each repository revision once for verification without mixing revisions', async () => {
   const connect = vi.fn(async () => fakeRepository());
   const load = verificationRepositories(connect);

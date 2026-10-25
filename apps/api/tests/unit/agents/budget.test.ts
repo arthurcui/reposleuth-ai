@@ -1,5 +1,6 @@
 /** Verifies model budget enforcement and usage accounting. */
 import { expect, it, vi } from 'vitest';
+
 import { BudgetModel, DEFAULT_LIMITS, emptyUsage } from '../../../src/agents/budget.js';
 
 it.each([

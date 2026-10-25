@@ -1,5 +1,6 @@
 /** Verifies credential-free history, filters, report reopening, export, and existing access guards. */
 import { afterEach, describe, expect, it } from 'vitest';
+
 import { buildApp } from '../../../src/app.js';
 import { InvestigationStore } from '../../../src/storage/sqlite.js';
 import { savedInvestigation } from '../../fixtures/savedInvestigation.js';

@@ -1,6 +1,7 @@
 /** Builds illustrative investigation records and activity events from the demo cases. */
 import type { Investigation, InvestigationEvent } from '@reposleuth/shared';
 import { cases } from '@reposleuth/shared/eval-cases';
+
 import { demoDetails } from './demoDetails';
 
 export const demoCases = cases;

@@ -1,6 +1,7 @@
 /** Verifies the consistency and case-specific content of illustrative demo investigations. */
-import { describe, expect, it } from 'vitest';
 import { reportSchema } from '@reposleuth/shared';
+import { describe, expect, it } from 'vitest';
+
 import { demoCases, demoForCase } from '../../src/features/demo/demo';
 import { demoDetails } from '../../src/features/demo/demoDetails';
 

@@ -1,7 +1,9 @@
 /** Supplies deterministic repository and model doubles for replay evaluations. */
 import { createHash } from 'node:crypto';
-import { Usage, type Model, type ModelResponse } from '@openai/agents';
+
+import { type Model, type ModelResponse, Usage } from '@openai/agents';
 import type { InvestigationReport } from '@reposleuth/shared';
+
 import { RepositoryError, type RepositoryProvider } from '../../src/github/RepositoryProvider.js';
 import type { EvalCase } from './cases.js';
 

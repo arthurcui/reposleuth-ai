@@ -1,6 +1,8 @@
 /** Provides a read-only CLI for inspecting a public GitHub repository and issue. */
 import { fileURLToPath } from 'node:url';
+
 import { config } from 'dotenv';
+
 import { OctokitProvider } from '../src/github/OctokitProvider.js';
 import { RepositoryError } from '../src/github/RepositoryProvider.js';
 

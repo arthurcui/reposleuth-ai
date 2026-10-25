@@ -1,6 +1,7 @@
 /** Verifies GitHub reads, limits, caching, and errors with mocked transport responses. */
 import { Octokit } from '@octokit/rest';
 import { describe, expect, it } from 'vitest';
+
 import { OctokitProvider } from '../../../src/github/OctokitProvider.js';
 import {
   LIMITS,
@@ -9,11 +10,11 @@ import {
   splitSource,
 } from '../../../src/github/repositoryIndex.js';
 import {
-  FIXTURE_SHA,
-  TREE_SHA,
   BLOB_SHA,
-  SOURCE,
+  FIXTURE_SHA,
   fixtureTree,
+  SOURCE,
+  TREE_SHA,
 } from '../../fixtures/githubFixtures.js';
 
 type Override = (

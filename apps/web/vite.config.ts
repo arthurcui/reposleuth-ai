@@ -1,7 +1,8 @@
 /** Configures the React development server, API proxy, and production web build. */
-import { defineConfig, loadEnv } from 'vite';
-import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
+
+import react from '@vitejs/plugin-react';
+import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(() => {
   const root = fileURLToPath(new URL('../../', import.meta.url));

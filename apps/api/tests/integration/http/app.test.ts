@@ -1,5 +1,6 @@
 /** Verifies API health and request validation through Fastify injection. */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { buildApp } from '../../../src/app.js';
 
 describe('local API foundation', () => {

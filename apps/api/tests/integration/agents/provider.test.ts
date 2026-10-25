@@ -1,7 +1,8 @@
 /** Verifies provider configuration and model adapter request behavior without live API calls. */
 import { afterEach, expect, it, vi } from 'vitest';
+
+import { liveModel } from '../../../src/agents/models/createModel.js';
 import { GEMINI, OPENAI, providerConfig } from '../../../src/agents/provider.js';
-import { liveModel } from '../../../src/agents/investigator.js';
 import { InvestigationService } from '../../../src/services/investigationService.js';
 import { InvestigationStore } from '../../../src/storage/sqlite.js';
 import { fakeRepository, validReport } from '../../fixtures/agentFixtures.js';

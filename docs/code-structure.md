@@ -8,6 +8,7 @@ should explain constraints or decisions rather than repeat the code.
 apps/api/
   src/
     agents/          Model configuration, prompts, tools, and budget enforcement
+      models/        Provider adapters and provider-specific request settings
     github/          Repository interface, GitHub implementation, source indexing
     routes/          HTTP endpoints and event streams
     services/        Investigation lifecycle and evidence validation
@@ -26,9 +27,10 @@ apps/api/
 apps/web/
   src/
     features/
-      investigations/ API client and engineering report rendering
+      investigations/ Form, activity, reports, model picker, and workspace state hook
+      history/        Saved investigation search and filtering
       demo/           Illustrative cases and case-specific explanations
-    App.tsx           Workspace state, form, activity, and navigation
+    App.tsx           Small composition shell for workspace and history
     main.tsx          Browser entry point
     styles.css        Shared presentation
   tests/
@@ -57,6 +59,24 @@ benchmarks/           Public benchmark manifest
   adding unsupported comments.
 
 ## Everyday checks
+
+ESLint enforces sorted imports/exports, duplicate-import rejection, and explicit
+type-only imports across TypeScript files. Runtime, CLI, and evaluation code use
+type-aware checks for unsafe assignments, arguments, calls, member access, and
+returns. Promise rules apply to those modules and tests: promises must be awaited
+or have a rejection handler; a `void` prefix does not count as error handling.
+Test mocks retain the base type-safety lint rules rather than the runtime unsafe-any
+rules, while all tests still undergo strict TypeScript checking.
+
+Import restrictions keep runtime code independent of tests/evaluations/CLI tools,
+prevent browser imports of API and Node modules, and keep shared contracts free
+of application dependencies. `tsconfig.eslint.json` supplies type information for
+these lint checks. Prefer shared contracts over imports across application folders.
+
+Run `npx eslint . --fix` to sort imports, then `npm run format` to apply Prettier.
+The workspace hook owns effects and actions; view components render the form,
+activity, and report navigation. Provider adapters live under `agents/models/`,
+leaving the investigator responsible for the tool loop and evidence validation.
 
 ```sh
 npm run format         # Apply consistent code formatting
