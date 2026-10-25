@@ -1,3 +1,4 @@
+/** Configures JavaScript and TypeScript lint rules for authored project code. */
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import globals from 'globals';
