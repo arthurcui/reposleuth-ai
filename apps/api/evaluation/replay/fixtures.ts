@@ -74,6 +74,13 @@ export function fixtureRepository(test: EvalCase): RepositoryProvider {
 }
 export function expectedReport(test: EvalCase): InvestigationReport {
   return {
+    reasoningSummary: {
+      assessment: test.rootCause,
+      evidenceIds: ['E1'],
+      alternatives: [],
+      counterEvidence: [],
+      limitations: 'Scripted fixture; no runtime verification or alternative-path coverage.',
+    },
     summary: test.rootCause,
     findings: [
       {

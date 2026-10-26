@@ -1,8 +1,12 @@
 /** Renders the live/demo investigation form and explicit submission controls. */
+import { investigationModes, investigationModeSchema } from '@reposleuth/shared';
+
 import { ModelPicker } from './ModelPicker';
 import type { InvestigationWorkspace } from './useInvestigationWorkspace';
 export function InvestigationForm({ workspace }: { workspace: InvestigationWorkspace }) {
   const {
+    mode,
+    setMode,
     showingDemo,
     repository,
     setRepository,
@@ -58,6 +62,27 @@ export function InvestigationForm({ workspace }: { workspace: InvestigationWorks
             placeholder="42"
             disabled={formDisabled}
           />
+          <label htmlFor="investigation-mode">Investigation mode</label>
+          <select
+            id="investigation-mode"
+            value={mode}
+            disabled={formDisabled}
+            aria-describedby="mode-description"
+            onChange={(event) => setMode(investigationModeSchema.parse(event.target.value))}
+          >
+            {Object.entries(investigationModes).map(([key, profile]) => (
+              <option key={key} value={key}>
+                {profile.label} · up to {profile.timeoutMs / 60000} min · $
+                {profile.costUsd.toFixed(2)}
+              </option>
+            ))}
+          </select>
+          <p id="mode-description" className="muted small">
+            {investigationModes[mode].description} Limits: {investigationModes[mode].turns} model
+            requests, {investigationModes[mode].tools} tool calls and{' '}
+            {investigationModes[mode].tokens.toLocaleString()} tokens. Cost is estimated;
+            conservative reservations and the server budget may stop a run earlier.
+          </p>
           <ModelPicker
             value={modelSelection}
             onChange={setModelSelection}

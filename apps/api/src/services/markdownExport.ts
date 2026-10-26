@@ -25,6 +25,12 @@ export function exportMarkdown(run: Investigation): string {
     `Created: ${text(run.createdAt)}`,
     `Status: ${text(run.status)}`,
     `Model: ${text(run.model)}`,
+    `Mode: ${run.request.mode ?? 'standard'}`,
+    ...(run.limits
+      ? [
+          `Limits: ${run.limits.timeoutMs / 60000} minutes · $${run.limits.costUsd.toFixed(2)} estimated cost`,
+        ]
+      : []),
     `Pinned commit: ${text(run.commitSha ?? 'Unavailable')}`,
     `Duration: ${(run.durationMs / 1000).toFixed(1)} seconds`,
     `Usage: ${run.usage.inputTokens} input tokens · ${run.usage.outputTokens} output tokens · ${run.usage.requests} requests`,
@@ -41,9 +47,30 @@ export function exportMarkdown(run: Investigation): string {
     '',
     text(report.summary),
     '',
-    '## Findings',
-    '',
   ];
+  if (report.reasoningSummary) {
+    const reasoning = report.reasoningSummary;
+    lines.push('## Evidence-based reasoning summary', '');
+    for (const [heading, entries] of [
+      ['Assessment', [{ explanation: reasoning.assessment, evidenceIds: reasoning.evidenceIds }]],
+      ['Alternatives considered', reasoning.alternatives],
+      ['Counter-evidence checked', reasoning.counterEvidence],
+    ] as const) {
+      lines.push(`### ${heading}`, '');
+      if (!entries.length) lines.push('No assessment recorded.', '');
+      for (const entry of entries)
+        lines.push(
+          text(entry.explanation),
+          '',
+          entry.evidenceIds.length
+            ? `Evidence: ${entry.evidenceIds.map((id) => `#${report.evidence.findIndex((item) => item.id === id) + 1}`).join(', ')}`
+            : 'Unverified · no source citation',
+          '',
+        );
+    }
+    lines.push(`Limitations: ${text(reasoning.limitations)}`, '');
+  }
+  lines.push('## Findings', '');
   for (const [index, finding] of report.findings.entries()) {
     lines.push(
       `### ${index + 1}. ${text(finding.title)}`,

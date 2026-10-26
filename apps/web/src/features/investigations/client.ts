@@ -1,8 +1,13 @@
 /** Validates API responses and provides investigation requests, status helpers, and source links. */
-import { investigationRequestSchema, reportSchema } from '@reposleuth/shared';
+import {
+  investigationLimitsSchema,
+  investigationRequestSchema,
+  reportSchema,
+} from '@reposleuth/shared';
 import { z } from 'zod';
 
 export const runSchema = z.object({
+  limits: investigationLimitsSchema.optional(),
   provider: z.enum(['openai', 'gemini']).optional(),
   id: z.string(),
   request: investigationRequestSchema,

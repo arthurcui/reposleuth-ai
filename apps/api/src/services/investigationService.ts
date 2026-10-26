@@ -2,9 +2,14 @@
 import { randomUUID } from 'node:crypto';
 
 import { type Model, ToolCallError } from '@openai/agents';
-import type { Investigation, InvestigationRequest, InvestigationStatus } from '@reposleuth/shared';
+import {
+  type Investigation,
+  investigationModes,
+  type InvestigationRequest,
+  type InvestigationStatus,
+} from '@reposleuth/shared';
 
-import { DEFAULT_LIMITS, emptyUsage, type RunLimits, StopError } from '../agents/budget.js';
+import { emptyUsage, type RunLimits, StopError } from '../agents/budget.js';
 import { investigate } from '../agents/investigator.js';
 import { OPENAI, type ProviderConfig } from '../agents/provider.js';
 import type { RepositoryProvider } from '../github/RepositoryProvider.js';
@@ -16,7 +21,7 @@ export class InvestigationService {
   private selections = new Map<string, ProviderConfig>();
   private active?: { id: string; controller: AbortController };
   private closed = false;
-  private readonly limits: RunLimits;
+  private readonly limits: Partial<RunLimits>;
   constructor(
     readonly store: InvestigationStore,
     private readonly repository: (input: string) => Promise<RepositoryProvider>,
@@ -25,7 +30,7 @@ export class InvestigationService {
     private readonly lifetimeBudgetUsd = 1,
     private readonly provider: ProviderConfig = OPENAI,
   ) {
-    this.limits = { ...DEFAULT_LIMITS, ...limits };
+    this.limits = limits;
     for (const record of store.active()) {
       record.status = 'interrupted';
       record.errorCode = 'PROCESS_RESTARTED';
@@ -84,6 +89,13 @@ export class InvestigationService {
     const record = this.store.get(id)!;
     const selected = this.selections.get(id) ?? this.provider;
     this.selections.delete(id);
+    const profile = investigationModes[record.request.mode ?? 'standard'];
+    const limits: RunLimits = { ...profile };
+    // Server/test overrides may only tighten a mode's ceilings.
+    for (const key of Object.keys(this.limits) as (keyof RunLimits)[]) {
+      limits[key] = Math.min(limits[key], this.limits[key]!);
+    }
+    record.limits = limits;
     const controller = new AbortController();
     this.active = { id, controller };
     record.status = 'running';
@@ -92,7 +104,8 @@ export class InvestigationService {
     this.store.append(id, 'started', {
       model: selected.model,
       provider: selected.provider,
-      limits: this.limits,
+      limits,
+      mode: record.request.mode ?? 'standard',
     });
     let terminal = false;
     const save = () => {
@@ -101,7 +114,7 @@ export class InvestigationService {
     const emit = (type: string, data: Record<string, unknown>) => {
       if (!this.closed && !terminal) this.store.append(id, type, data);
     };
-    const timer = setTimeout(() => controller.abort('TIMEOUT'), this.limits.timeoutMs);
+    const timer = setTimeout(() => controller.abort('TIMEOUT'), limits.timeoutMs);
     let onAbort: () => void = () => {};
     const cancelled = new Promise<never>((_, reject) => {
       onAbort = () =>
@@ -143,7 +156,7 @@ export class InvestigationService {
           repository,
           request: record.request,
           model: this.model(selected),
-          limits: this.limits,
+          limits,
           usage: record.usage,
           signal: controller.signal,
           reserve: (usd) => {

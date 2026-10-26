@@ -18,7 +18,53 @@ export const evidenceSchema = z.object({
   endLine: z.number().int().positive(),
   quote: text,
 });
+export const investigationModes = {
+  quick: {
+    label: 'Quick',
+    description: 'Trace the most likely path and report key uncertainty.',
+    turns: 6,
+    tools: 10,
+    tokens: 50000,
+    outputTokens: 2000,
+    timeoutMs: 60000,
+    costUsd: 0.02,
+  },
+  standard: {
+    label: 'Standard',
+    description: 'Trace the relevant path and assess an alternative cause.',
+    turns: 12,
+    tools: 24,
+    tokens: 100000,
+    outputTokens: 2000,
+    timeoutMs: 120000,
+    costUsd: 0.05,
+  },
+  deep: {
+    label: 'Deep',
+    description: 'Examine related paths, competing causes and counter-evidence.',
+    turns: 24,
+    tools: 48,
+    tokens: 300000,
+    outputTokens: 2000,
+    timeoutMs: 300000,
+    costUsd: 0.15,
+  },
+} as const;
+export const investigationModeSchema = z.enum(['quick', 'standard', 'deep']);
+export type InvestigationMode = z.infer<typeof investigationModeSchema>;
+export const reasoningSummarySchema = z.object({
+  assessment: text,
+  alternatives: z
+    .array(z.object({ explanation: text, evidenceIds: z.array(z.string()).max(20) }))
+    .max(3),
+  counterEvidence: z
+    .array(z.object({ explanation: text, evidenceIds: z.array(z.string()).max(20) }))
+    .max(3),
+  evidenceIds: z.array(z.string()).max(20),
+  limitations: text,
+});
 export const reportSchema = z.object({
+  reasoningSummary: reasoningSummarySchema.optional(),
   summary: text,
   findings: z
     .array(
@@ -40,6 +86,7 @@ export const reportSchema = z.object({
 });
 export const investigationRequestSchema = z
   .object({
+    mode: investigationModeSchema.optional(),
     repository: z.string().trim().min(3).max(250),
     issueNumber: z.number().int().positive().optional(),
     question: z.string().trim().min(5).max(2000),
@@ -68,7 +115,16 @@ export interface InvestigationUsage {
   reservedCostUsd: number;
   usageIncomplete: boolean;
 }
+export const investigationLimitsSchema = z.object({
+  costUsd: z.number().positive(),
+  timeoutMs: z.number().positive(),
+  turns: z.number().positive(),
+  tools: z.number().positive(),
+  tokens: z.number().positive(),
+  outputTokens: z.number().positive(),
+});
 export interface Investigation {
+  limits?: z.infer<typeof investigationLimitsSchema>;
   provider?: 'openai' | 'gemini';
   id: string;
   request: InvestigationRequest;

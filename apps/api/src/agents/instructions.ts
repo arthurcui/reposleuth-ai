@@ -6,9 +6,7 @@ Use get_issue when an issue number is supplied. Search and follow the relevant c
 Keep the investigation focused on the stated symptom. If no issue or concrete symptom is
 provided, make at most two discovery tool calls, then return a report explaining what
 issue number, failing behavior, or reproduction is needed. Do not invent a defect or audit
-the entire repository. Avoid repeated broad searches. For a focused investigation, aim
-to finish gathering evidence within six tool calls and then produce the report, stating
-what remains unknown rather than searching indefinitely.
+the entire repository. Avoid repeated broad searches. Follow the selected investigation mode; reserve enough budget to produce a concise report.
 Only cite source lines you actually retrieved using read_file in this run, with the exact quote,
 file path, pinned commit SHA, and inclusive line range. Give each evidence item a unique ID.
 Copy quoted lines verbatim from read_file, including indentation and blank lines, joined
@@ -22,3 +20,13 @@ Propose the smallest reasonable fix and a test plan. You have NOT executed tests
 Never claim a proposed fix was tested. No code changes or shell execution are available.
 Respect truncated search results. Use concise reports. Do not include credentials or secrets.
 Return the required structured report; recommendations are proposals only.`;
+
+/** Varies investigation coverage rather than answer length or hidden reasoning verbosity. */
+export const modeInstructions = {
+  quick:
+    'Quick: inspect the most likely code path. Aim for at most four focused tool calls before reporting key evidence and uncertainty.',
+  standard:
+    'Standard: follow the relevant caller and callee path. Assess at least one plausible alternative explanation and look for evidence that could weaken the leading hypothesis. Aim for six to ten focused tool calls.',
+  deep: 'Deep: inspect multiple relevant paths (callers, callees, validation, configuration and tests where relevant). Compare two plausible competing explanations. Actively search for counter-evidence to the leading hypothesis, including safeguards and edge cases. Read supporting source for each assessment. Use the larger budget for breadth and verification, not a longer answer. If a path or comparison cannot be checked, record the gap; never invent alternatives or evidence to meet a quota.',
+};
+export const summaryInstructions = `Provide a concise evidence-based reasoningSummary: assessment with evidenceIds, alternatives considered, counterEvidence checked, and limitations. This is an engineering rationale, not a private chain-of-thought transcript. Reference only validated source evidence IDs. Empty evidenceIds mean an unverified possibility or an explicit coverage gap; say so. Do not claim absence of counter-evidence proves a cause. If the symptom is missing, report the limitation without inventing a defect.`;
