@@ -20,12 +20,13 @@ export function liveModel(apiKey: string, config: ProviderConfig = OPENAI): Mode
     getResponse: (request) =>
       delegate.getResponse({
         ...request,
-        // Use JSON-object mode with function tools; the strict JSON-schema request
-        // is rejected by Gemini. The SDK still validates the final report schema.
-        systemInstructions: `${request.systemInstructions ?? ''}\nWhen finished, return only JSON matching this schema:\n${JSON.stringify(request.outputType)}`,
+        // Gemini compatibility uses JSON-object mode, including final reporting.
+        // Pass the schema itself (not the SDK envelope) and validate strictly locally.
+        systemInstructions: `${request.systemInstructions ?? ''}\nWhen finished, return only JSON matching this schema. Return an instance with actual findings, never the schema itself. No markdown fences or surrounding commentary:\n${JSON.stringify(typeof request.outputType === 'object' ? request.outputType.schema : request.outputType)}`,
         outputType: 'text',
         modelSettings: {
           ...request.modelSettings,
+          toolChoice: request.tools.length === 0 ? undefined : request.modelSettings.toolChoice,
           providerData: {
             ...request.modelSettings.providerData,
             response_format: { type: 'json_object' },

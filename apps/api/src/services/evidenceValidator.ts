@@ -5,6 +5,7 @@ import { StopError } from '../agents/budget.js';
 import type { RepositoryRevision, SourceFile } from '../github/RepositoryProvider.js';
 
 export type EvidenceFailure =
+  | 'UNKNOWN_HANDLE'
   | 'DUPLICATE_ID'
   | 'COMMIT_MISMATCH'
   | 'INVALID_LINE_RANGE'

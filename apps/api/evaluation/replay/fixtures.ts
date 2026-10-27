@@ -136,7 +136,20 @@ export class ReplayModel implements Model {
               type: 'message',
               role: 'assistant',
               status: 'completed',
-              content: [{ type: 'output_text', text: JSON.stringify(expectedReport(this.test)) }],
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify({
+                    ...expectedReport(this.test),
+                    evidence: expectedReport(this.test).evidence.map((e) => ({
+                      id: e.id,
+                      handle: 'read-1',
+                      startLine: e.startLine,
+                      endLine: e.endLine,
+                    })),
+                  }),
+                },
+              ],
             },
           ],
     };

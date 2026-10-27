@@ -151,7 +151,7 @@ describe('investigation lifecycle and API', () => {
 
   it('returns an explicit failure for invented evidence', async () => {
     const report = validReport();
-    report.evidence[0]!.quote = 'invented';
+    report.evidence[0]!.endLine = 2;
     const service = make(() => new ScriptedModel(report));
     expect(await finish(service, service.start(request).id)).toMatchObject({
       status: 'failed',
@@ -170,11 +170,16 @@ describe('investigation lifecycle and API', () => {
     expect(model.requests).toHaveLength(0);
   });
 
-  it('records tool-budget exhaustion as a budget terminal state', async () => {
+  it('produces a partial report when the exploration tool budget ends', async () => {
     const service = make(() => new ScriptedModel(), { tools: 1 });
     expect(await finish(service, service.start(request).id)).toMatchObject({
-      status: 'budget_exceeded',
-      errorCode: 'BUDGET_EXCEEDED_TOOLS',
+      status: 'completed',
+      report: {
+        findings: [],
+        unresolvedQuestions: expect.arrayContaining([
+          expect.stringContaining('Partial investigation'),
+        ]),
+      },
     });
   });
 

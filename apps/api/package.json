@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "node --watch --import tsx src/server.ts",
     "build": "tsup src/server.ts --format esm --platform node --target node22 --clean",
     "start": "node dist/server.js",
     "inspect": "tsx cli/inspect.ts",
     "smoke:agent": "tsx evaluation/smoke.ts",
     "eval": "tsx evaluation/replay/runner.ts",
     "eval:review": "tsx evaluation/replay/review.ts",
-    "benchmark": "tsx evaluation/benchmarks/runner.ts"
+    "benchmark": "tsx evaluation/benchmarks/runner.ts",
+    "benchmark:grade": "tsx evaluation/benchmarks/grade.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.7",
