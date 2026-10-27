@@ -8,6 +8,7 @@ import { config } from 'dotenv';
 import { z } from 'zod';
 
 import { DEFAULT_LIMITS } from '../../src/agents/budget.js';
+import { PROMPT_VERSION } from '../../src/agents/instructions.js';
 import { liveModel } from '../../src/agents/models/createModel.js';
 import { OPENAI, providerConfig } from '../../src/agents/provider.js';
 import { OctokitProvider } from '../../src/github/OctokitProvider.js';
@@ -132,6 +133,7 @@ async function main() {
     issueUrl: string;
     issueHash: string;
     issue: unknown;
+    events: { type: string; data: Record<string, unknown> }[];
     validationDiagnostics: Record<string, unknown>[];
     run: Investigation;
   }[] = [];
@@ -144,6 +146,7 @@ async function main() {
           mode: 'live-github',
           generatedAt: new Date().toISOString(),
           model: provider.model,
+          promptVersion: PROMPT_VERSION,
           limits: DEFAULT_LIMITS,
           planned: cases.map((c) => c.id),
           completed: results.filter((r) => r.run.status === 'completed').length,
@@ -215,6 +218,7 @@ async function main() {
         issueHash,
         issue,
         validationDiagnostics,
+        events: service.store.events(id),
         run,
       });
       save();

@@ -78,6 +78,12 @@ export function ModelPicker({
           </optgroup>
         ))}
       </select>
+      {value.startsWith('unknown:') && (
+        <p className="notice">
+          Saved model: {value.slice('unknown:'.length)}. Its provider was not recorded. Choose an
+          available model before starting another investigation.
+        </p>
+      )}
       {(error || Boolean(catalog?.errors.length)) && (
         <button
           type="button"

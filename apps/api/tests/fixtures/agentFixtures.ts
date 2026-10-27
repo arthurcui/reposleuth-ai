@@ -109,7 +109,14 @@ export class ScriptedModel implements Model {
         arguments: JSON.stringify({ path: 'src/customers.ts', startLine: 1, endLine: 1 }),
       },
     ];
-    const call = calls[step - 1];
+    const call = request.modelSettings.toolChoice === 'none' ? undefined : calls[step - 1];
+    const report = structuredClone(this.report);
+    if (!call && step < 4) {
+      report.findings = [];
+      report.evidence = [];
+      report.reasoningSummary!.evidenceIds = [];
+      report.summary = 'Insufficient source evidence; investigation ended before reading code.';
+    }
     return {
       usage: new Usage({ requests: 1, inputTokens: 200, outputTokens: 100 }),
       output: call
@@ -119,7 +126,20 @@ export class ScriptedModel implements Model {
               type: 'message',
               role: 'assistant',
               status: 'completed',
-              content: [{ type: 'output_text', text: JSON.stringify(this.report) }],
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify({
+                    ...report,
+                    evidence: report.evidence.map((e) => ({
+                      id: e.id,
+                      handle: 'read-1',
+                      startLine: e.startLine,
+                      endLine: e.endLine,
+                    })),
+                  }),
+                },
+              ],
             },
           ],
     };

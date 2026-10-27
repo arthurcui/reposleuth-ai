@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { demoCases, demoForCase } from '../demo/demo';
 import { api, eventSchema, isActive, runSchema } from './client';
+import { savedModelSelection } from './savedModelSelection';
 const currentId = () => new URLSearchParams(location.search).get('investigation');
 const currentCase = () => {
   const selected = new URLSearchParams(location.search).get('case');
@@ -106,14 +107,7 @@ export function useInvestigationWorkspace() {
           setIssue(result.request.issueNumber?.toString() ?? '');
           setQuestion(result.request.question);
           setMode(result.request.mode ?? 'standard');
-          const selection = result.request.modelSelection;
-          setModelSelection(
-            selection
-              ? `${selection.provider}:${selection.model}`
-              : result.provider
-                ? `${result.provider}:${result.model}`
-                : '',
-          );
+          setModelSelection(savedModelSelection(result));
           formLoaded = true;
         }
         setRun(result);
@@ -152,10 +146,12 @@ export function useInvestigationWorkspace() {
       'queued',
       'started',
       'revision',
+      'source_read',
       'tool_started',
       'tool_finished',
       'usage',
       'validating',
+      'reporting',
       'validation_failed',
       'terminal',
     ])
@@ -186,6 +182,12 @@ export function useInvestigationWorkspace() {
     event.preventDefault();
     if (formDisabled) return;
     setError('');
+    if (modelSelection.startsWith('unknown:')) {
+      setError(
+        'The saved model’s provider is unknown. Choose an available model before starting another investigation.',
+      );
+      return;
+    }
     const parsed = investigationRequestSchema.safeParse({
       repository,
       mode,

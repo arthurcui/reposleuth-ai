@@ -27,83 +27,103 @@ async function finish(service: InvestigationService) {
   throw new Error('Test timed out');
 }
 
-it('runs Gemini tool calls and validates the report using its own model and prices', async () => {
-  const bodies: Record<string, unknown>[] = [];
-  const fetch = vi.fn(async (url: string, init: RequestInit) => {
-    expect(String(url)).toBe(
-      'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    );
-    const body = JSON.parse(String(init.body));
-    bodies.push(body);
-    expect(body.model).toBe(GEMINI.model);
-    expect(body).not.toHaveProperty('service_tier');
-    expect(body).not.toHaveProperty('store');
-    expect(body.response_format).toEqual({ type: 'json_object' });
-    expect(JSON.stringify(body.messages)).toContain(
-      'When finished, return only JSON matching this schema',
-    );
-    expect(body.reasoning_effort).toBe('minimal');
-    expect(body.max_tokens).toBe(2000);
-    const message =
-      bodies.length === 1
-        ? {
-            role: 'assistant',
-            content: null,
-            tool_calls: [
-              {
-                id: 'read-1',
-                type: 'function',
-                extra_content: { google: { thought_signature: 'test-signature' } },
-                function: {
-                  name: 'read_file',
-                  arguments: JSON.stringify({ path: 'src/customers.ts', startLine: 1, endLine: 1 }),
+it.each([false, true])(
+  'runs Gemini tools and validates reports with reserved final phase=%s',
+  async (reserveFinal) => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetch = vi.fn(async (url: string, init: RequestInit) => {
+      expect(String(url)).toBe(
+        'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+      );
+      const body = JSON.parse(String(init.body));
+      bodies.push(body);
+      expect(body.model).toBe(GEMINI.model);
+      expect(body).not.toHaveProperty('service_tier');
+      expect(body).not.toHaveProperty('store');
+      expect(body.response_format).toEqual({ type: 'json_object' });
+      if (reserveFinal && bodies.length === 2) {
+        expect(body.tools ?? []).toEqual([]);
+        expect(body).not.toHaveProperty('tool_choice');
+      }
+      expect(JSON.stringify(body.messages)).toContain(
+        'When finished, return only JSON matching this schema',
+      );
+      expect(body.reasoning_effort).toBe('minimal');
+      expect(body.max_tokens).toBe(2000);
+      const message =
+        bodies.length === 1
+          ? {
+              role: 'assistant',
+              content: null,
+              tool_calls: [
+                {
+                  id: 'read-1',
+                  type: 'function',
+                  extra_content: { google: { thought_signature: 'test-signature' } },
+                  function: {
+                    name: 'read_file',
+                    arguments: JSON.stringify({
+                      path: 'src/customers.ts',
+                      startLine: 1,
+                      endLine: 1,
+                    }),
+                  },
                 },
-              },
-            ],
-          }
-        : { role: 'assistant', content: JSON.stringify(validReport()) };
-    return new Response(
-      JSON.stringify({
-        id: `completion-${bodies.length}`,
-        object: 'chat.completion',
-        created: 1,
-        model: GEMINI.model,
-        choices: [
-          { index: 0, message, finish_reason: bodies.length === 1 ? 'tool_calls' : 'stop' },
-        ],
-        usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100 },
-      }),
-      { headers: { 'content-type': 'application/json' } },
-    );
-  });
-  vi.stubGlobal('fetch', fetch);
-  const service = new InvestigationService(
-    new InvestigationStore(':memory:'),
-    async () => fakeRepository(),
-    () => liveModel('test-key', GEMINI),
-    {},
-    1,
-    GEMINI,
-  );
-  try {
-    const run = await finish(service);
-    expect(run).toMatchObject({
-      status: 'completed',
-      model: GEMINI.model,
-      usage: { requests: 2, inputTokens: 2000, outputTokens: 200, usageIncomplete: false },
+              ],
+            }
+          : {
+              role: 'assistant',
+              content: JSON.stringify({
+                ...validReport(),
+                evidence: [{ id: 'e1', handle: 'read-1', startLine: 1, endLine: 1 }],
+              }),
+            };
+      return new Response(
+        JSON.stringify({
+          id: `completion-${bodies.length}`,
+          object: 'chat.completion',
+          created: 1,
+          model: GEMINI.model,
+          choices: [
+            { index: 0, message, finish_reason: bodies.length === 1 ? 'tool_calls' : 'stop' },
+          ],
+          usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100 },
+        }),
+        { headers: { 'content-type': 'application/json' } },
+      );
     });
-    expect(run.usage.estimatedCostUsd).toBeCloseTo(
-      2000 * GEMINI.rates.input + 200 * GEMINI.rates.output,
+    vi.stubGlobal('fetch', fetch);
+    const service = new InvestigationService(
+      new InvestigationStore(':memory:'),
+      async () => fakeRepository(),
+      () => liveModel('test-key', GEMINI),
+      reserveFinal ? { turns: 2 } : {},
+      1,
+      GEMINI,
     );
-    expect(bodies[1]!.messages).toEqual(
-      expect.arrayContaining([expect.objectContaining({ role: 'tool', tool_call_id: 'read-1' })]),
-    );
-    expect(JSON.stringify(bodies[1]!.messages)).toContain('test-signature');
-    expect(run.report?.evidence).toHaveLength(1);
-  } finally {
-    service.close();
-  }
-});
+    try {
+      const run = await finish(service);
+      expect(run).toMatchObject({
+        status: 'completed',
+        model: GEMINI.model,
+        usage: { requests: 2, inputTokens: 2000, outputTokens: 200, usageIncomplete: false },
+      });
+      expect(run.usage.estimatedCostUsd).toBeCloseTo(
+        2000 * GEMINI.rates.input + 200 * GEMINI.rates.output,
+      );
+      if (!reserveFinal)
+        expect(bodies[1]!.messages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ role: 'tool', tool_call_id: 'read-1' }),
+          ]),
+        );
+      expect(JSON.stringify(bodies[1]!.messages)).toContain('test-signature');
+      expect(run.report?.evidence).toHaveLength(1);
+    } finally {
+      service.close();
+    }
+  },
+);
 
 it.each([
   [401, 'AUTHENTICATION'],

@@ -79,6 +79,10 @@ without diagnostics cannot identify the precise mismatch retrospectively.
 
 ## Independent review and fair comparison
 
+Independent human review can provide additional confidence, but is not required
+to use the automated grader below. AI judgments are labeled separately and never
+reported as independent human validation.
+
 The private answer key and reproduction checks are kept locally under the ignored
 `data/benchmarks/private/` directory, outside all three published repositories.
 It includes causes, fixes, exact source references, expected observations, and
@@ -107,3 +111,68 @@ All three applications build. Separate private checks reproduce all ten backend
 symptoms via actual HTTP requests and all five frontend symptoms through React
 component interaction tests. These checks assert the observed defective behavior;
 they are not passing correctness tests and do not establish model performance.
+
+## Automated grading
+
+Run the offline checks over saved CLI results and application-history runs:
+
+```sh
+npm run benchmark:grade
+```
+
+This does not launch investigations, load provider credentials, or make model/network
+requests. It deduplicates run IDs, retains failed attempts, and lists missing case coverage.
+Private answers are read only by this evaluation command, never by the investigator or
+web application. Pinned source is read from local Git objects under
+`data/benchmarks/repos/`; missing revisions produce an unverified result, not a pass.
+The private answers must match the public manifest and their cited source lines.
+
+Outputs are new, ignored folders under `data/benchmarks/reviews/automated-<id>/`:
+`grades.json` contains individual checks/judgments and `scorecard.csv` is a compact table.
+Original reports and history remain unchanged. Failed reports have no semantic scores;
+exact citations without an AI judgment are explicitly **unscored**. A source mismatch
+or unavailable snapshot cannot silently pass. Input reports containing malformed schemas
+stop the command instead of being silently omitted. Up to 200 saved attempts are accepted.
+
+Optionally evaluate one CLI result file with `--input <result.json>`. Without this option,
+the command reads all saved live benchmark JSON results and benchmark-repository runs in
+application history. GitHub verification records and synthetic demos are excluded.
+
+For AI semantic scoring, explicitly opt in and set a maximum dollar budget, for example:
+
+```sh
+npm run benchmark:grade -- --judge --max-usd 0.10
+```
+
+This example is potentially billable. It uses the configured `LLM_PROVIDER`, model and
+server credentials, in a separate, tool-free evaluator call. The evaluator receives the
+saved question/report, private expected cause/fix and verified source excerpts; these
+private inputs are sent to the selected provider only with `--judge`. It scores root cause,
+evidence relevance, fix and uncertainty (0–2), and distinguishes alternative causes from
+alternative fixes. Treat scores as AI-assisted judgments, not ground truth or executed tests.
+A diagnosis pass requires scores of 2 for cause, evidence and fix. Deep coverage is reported
+separately, so a correct diagnosis can still have a depth gap.
+
+Uncertain judgments or mechanically detected Deep gaps trigger at most one additional
+assessment of the original input, without seeing the first judgment. Disagreement remains
+uncertain; no human review is required to finish the command. This is a second model call,
+not independent human review, and correlated errors remain possible. The evaluator cannot
+execute source code or use repository tools. Its source context is bounded to the supplied
+excerpts, so it should mark context-dependent conclusions uncertain.
+
+The judge has a separate persistent reservation ledger at
+`data/benchmarks/reviews/judge-budget.sqlite`. `--max-usd` must be positive and at most $1;
+it caps both this invocation and the ledger's cumulative conservative reservations. It is
+not fresh credit on each run. Failed/uncertain calls retain reservations. Grading stops on
+a judge failure or budget stop, saves completed grades, and exits unsuccessfully; remaining
+run IDs stay listed as planned. Cost estimates use configured model prices, not invoice guarantees.
+No automatic fallback, new investigation, or unlimited retry occurs.
+
+Grades record the grader version, answer hash, evaluator model/usage, source commits,
+original costs/durations, and judgment-input hashes. New benchmark investigations also
+record the investigator prompt version and source-read events with path/range/handle.
+Historical runs without path events cannot establish all paths examined; a single cited
+path is reported as lack of demonstrated breadth, not proof that only one file was read.
+
+All private answers, saved results and grades remain under Git-ignored `data/`, excluded
+from Docker. Do not publish private expected answers into the benchmark repositories.

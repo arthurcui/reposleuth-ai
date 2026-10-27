@@ -28,6 +28,20 @@ export const emptyUsage = (): InvestigationUsage => ({
   usageIncomplete: false,
 });
 
+/** Shared conservative input estimate for exploration planning and hard request admission. */
+export function inputTokenBound(request: ModelRequest): number {
+  return (
+    Buffer.byteLength(
+      JSON.stringify({
+        input: request.input,
+        system: request.systemInstructions,
+        tools: request.tools,
+        output: request.outputType,
+      }),
+    ) + 4096
+  );
+}
+
 export class BudgetModel implements Model {
   constructor(
     private readonly delegate: Model,
@@ -44,15 +58,7 @@ export class BudgetModel implements Model {
     this.check();
     // Full history is sent each time. UTF-8 bytes + overhead is a conservative input estimate,
     // not a tokenizer or an invoice guarantee; no server-side conversation state is used.
-    const inputBound =
-      Buffer.byteLength(
-        JSON.stringify({
-          input: request.input,
-          system: request.systemInstructions,
-          tools: request.tools,
-          output: request.outputType,
-        }),
-      ) + 4096;
+    const inputBound = inputTokenBound(request);
     const bound = inputBound * this.rates.input + this.limits.outputTokens * this.rates.output;
     if (this.usage.requests >= this.limits.turns) throw new StopError('BUDGET_EXCEEDED_REQUESTS');
     if (inputBound > 80000) throw new StopError('BUDGET_EXCEEDED_CONTEXT');

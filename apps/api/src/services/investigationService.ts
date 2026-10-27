@@ -159,6 +159,8 @@ export class InvestigationService {
           limits,
           usage: record.usage,
           signal: controller.signal,
+          remainingBudget: () => this.lifetimeBudgetUsd - this.store.reserved(),
+          deadline: Date.parse(record.startedAt!) + limits.timeoutMs,
           reserve: (usd) => {
             if (controller.signal.aborted || this.closed) throw new StopError('CANCELLED');
             this.store.reserve(usd, this.lifetimeBudgetUsd);

@@ -47,6 +47,14 @@ and cost limits. Reports cite file paths and line ranges from the pinned revisio
 Citation validation checks source support; root-cause conclusions remain hypotheses
 for engineers to review.
 
+The agent reserves capacity for reporting before continuing exploration. As request,
+tool, token, cost, context, or time limits approach, it disables further tools and asks
+for a partial report using the evidence already collected. Activity shows the reason;
+the saved report lists the remaining coverage gaps. Source citations still pass the
+same validation. Final requests remain inside the original limits—provider errors,
+cancellation, slow requests, or a budget too small for even one response can still
+prevent a report. No extra budget or automatic retry is added.
+
 ## Requirements
 
 - Node.js 22.13+, 24.x, or 26+ and npm (Node 24 LTS recommended).
@@ -94,6 +102,15 @@ Google's account rules. [Gemini pricing](https://ai.google.dev/gemini-api/docs/p
 (checked October 24, 2026).
 
 ## Investigation depth
+
+Successful source reads return evidence handles. The model selects a handle and a
+contained line range; the backend constructs the exact quote, path, and pinned
+commit. Citation validation still checks references and ranges. Valid citations
+do not by themselves establish a correct diagnosis.
+
+Saved benchmark attempts can be checked without model calls using
+`npm run benchmark:grade`. See [automated grading](docs/public-benchmarks.md#automated-grading)
+for optional AI scoring, privacy boundaries, and spending limits.
 
 Choose a mode before starting; Standard remains the default for older clients and saved runs.
 

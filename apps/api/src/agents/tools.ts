@@ -15,17 +15,25 @@ export function createTools(
   check: () => void,
   emit: (type: string, data: Record<string, unknown>) => void,
   maxTools: number,
+  allowTool?: () => boolean,
+  maxOutputBytes = 120000,
 ) {
   let calls = 0;
   async function invoke(name: string, action: () => Promise<unknown>) {
     check();
+    if (allowTool && !allowTool())
+      return JSON.stringify({
+        error: 'EXPLORATION_COMPLETE',
+        message:
+          'No further tools in this turn. Use existing results; if exploration has ended, report findings and uncertainties.',
+      });
     if (++calls > maxTools) throw new StopError('BUDGET_EXCEEDED_TOOLS');
     emit('tool_started', { name, call: calls });
     try {
       const value = await action();
       check();
       const output = JSON.stringify(value);
-      if (output.length > 30000) {
+      if (output.length > 30000 || Buffer.byteLength(output) > maxOutputBytes) {
         emit('tool_finished', { name, outcome: 'output_limit' });
         return JSON.stringify({
           error: 'OUTPUT_LIMIT',
@@ -71,7 +79,8 @@ export function createTools(
     }),
     tool({
       name: 'read_file',
-      description: 'Retrieve exact source lines for evidence; at most 200 lines.',
+      description:
+        'Read source and receive a run-scoped evidence handle. Cite that handle and a contained line range; at most 200 lines. Keep each cited excerpt under 4000 characters.',
       parameters: z.object({
         path,
         startLine: z.number().int().positive(),
@@ -81,8 +90,23 @@ export function createTools(
       execute: ({ path, startLine, endLine }) =>
         invoke('read_file', async () => {
           const file = await repository.readFile(path, startLine, endLine);
-          if (JSON.stringify(file).length <= 30000) reads.push(file);
-          return file;
+          const result = { ...file, evidenceHandle: `read-${reads.length + 1}` };
+          // Register only content actually returned to the model, including handle overhead.
+          if (
+            JSON.stringify(result).length <= 30000 &&
+            Buffer.byteLength(JSON.stringify(result)) <= maxOutputBytes
+          ) {
+            check();
+            reads.push(file);
+            emit('source_read', {
+              path: file.path,
+              commitSha: file.commitSha,
+              startLine: file.startLine,
+              endLine: file.endLine,
+              handle: result.evidenceHandle,
+            });
+          }
+          return result;
         }),
     }),
     tool({

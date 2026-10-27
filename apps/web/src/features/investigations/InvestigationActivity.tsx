@@ -203,6 +203,15 @@ export function InvestigationActivity({ workspace }: { workspace: InvestigationW
                 <time>{new Date(event.at).toLocaleTimeString()}</time>
                 <div>
                   <strong>{event.type.replaceAll('_', ' ')}</strong>
+                  {event.type === 'source_read' && typeof event.data.path === 'string' && (
+                    <span>
+                      {event.data.path}
+                      {typeof event.data.startLine === 'number' &&
+                      typeof event.data.endLine === 'number'
+                        ? `:${event.data.startLine}–${event.data.endLine}`
+                        : ''}
+                    </span>
+                  )}
                   {typeof event.data.name === 'string' && (
                     <span>{event.data.name.replaceAll('_', ' ')}</span>
                   )}

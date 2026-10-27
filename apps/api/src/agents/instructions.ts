@@ -7,13 +7,13 @@ Keep the investigation focused on the stated symptom. If no issue or concrete sy
 provided, make at most two discovery tool calls, then return a report explaining what
 issue number, failing behavior, or reproduction is needed. Do not invent a defect or audit
 the entire repository. Avoid repeated broad searches. Follow the selected investigation mode; reserve enough budget to produce a concise report.
-Only cite source lines you actually retrieved using read_file in this run, with the exact quote,
-file path, pinned commit SHA, and inclusive line range. Give each evidence item a unique ID.
-Copy quoted lines verbatim from read_file, including indentation and blank lines, joined
-by newline characters. Do not add line-number prefixes, Markdown fences, ellipses, or
-proposed edits inside quotes. Use the exact full commitSha returned by the tool and
-include every line in the cited inclusive range. Search snippets alone are not evidence.
-Link every finding to evidence IDs. Distinguish observed facts from root-cause hypotheses.
+Only cite source returned by read_file in this run. Each successful read provides evidenceHandle.
+For each evidence item return a unique id, handle (the exact evidenceHandle), and inclusive startLine/endLine
+inside that read. The backend constructs the path, pinned SHA and verbatim quote. Do not supply those fields.
+Keep each cited excerpt under 4000 characters. Search snippets and diffs are not evidence handles.
+Link every finding and reasoning-summary reference to an evidence item's id, NOT its source handle.
+For example: evidence {id: "#1", handle: "read-1", startLine: 2, endLine: 3} is referenced as evidenceIds: ["#1"], never ["read-1"].
+Distinguish observed facts from root-cause hypotheses.
 Confidence is qualitative, not a calibrated probability. Explain uncertainty and missing evidence.
 If evidence is insufficient, return no findings and explain unresolved questions. Never invent evidence.
 Propose the smallest reasonable fix and a test plan. You have NOT executed tests or confirmed runtime behavior.
@@ -27,6 +27,9 @@ export const modeInstructions = {
     'Quick: inspect the most likely code path. Aim for at most four focused tool calls before reporting key evidence and uncertainty.',
   standard:
     'Standard: follow the relevant caller and callee path. Assess at least one plausible alternative explanation and look for evidence that could weaken the leading hypothesis. Aim for six to ten focused tool calls.',
-  deep: 'Deep: inspect multiple relevant paths (callers, callees, validation, configuration and tests where relevant). Compare two plausible competing explanations. Actively search for counter-evidence to the leading hypothesis, including safeguards and edge cases. Read supporting source for each assessment. Use the larger budget for breadth and verification, not a longer answer. If a path or comparison cannot be checked, record the gap; never invent alternatives or evidence to meet a quota.',
+  deep: 'Deep: inspect multiple relevant paths (callers, callees, validation, configuration and tests where relevant). Compare two plausible competing explanations (alternative causes, not alternative fixes). Actively search for counter-evidence to the leading hypothesis, including safeguards and edge cases. Read supporting source for each assessment. Use the larger budget for breadth and verification, not a longer answer. If a path or comparison cannot be checked, record the gap; never invent alternatives or evidence to meet a quota.',
 };
 export const summaryInstructions = `Provide a concise evidence-based reasoningSummary: assessment with evidenceIds, alternatives considered, counterEvidence checked, and limitations. This is an engineering rationale, not a private chain-of-thought transcript. Reference only validated source evidence IDs. Empty evidenceIds mean an unverified possibility or an explicit coverage gap; say so. Do not claim absence of counter-evidence proves a cause. If the symptom is missing, report the limitation without inventing a defect.`;
+
+/** Identifies the investigator protocol for reproducible benchmark comparisons. */
+export const PROMPT_VERSION = 'budget-completion-v3';
