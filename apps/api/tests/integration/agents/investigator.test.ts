@@ -171,7 +171,18 @@ describe('SDK investigation loop', () => {
         },
       }),
     ).rejects.toMatchObject({ code: 'INVALID_EVIDENCE', reason: 'INVALID_LINE_RANGE' });
-    expect(diagnostics).toEqual([{ reason: 'INVALID_LINE_RANGE', evidenceIndex: 1 }]);
+    expect(diagnostics).toEqual([
+      {
+        reason: 'INVALID_LINE_RANGE',
+        evidenceIndex: 1,
+        range: {
+          problem: 'OUTSIDE_READ',
+          readIndex: 1,
+          requested: { startLine: 1, endLine: 2 },
+          available: { startLine: 1, endLine: 1 },
+        },
+      },
+    ]);
     expect(JSON.stringify(diagnostics)).not.toContain('untrusted rejected text');
     expect(model.requests).toHaveLength(4);
   });

@@ -5,6 +5,7 @@ import { expect, it } from 'vitest';
 import { createTools } from '../../../src/agents/tools.js';
 import type { SourceFile } from '../../../src/github/RepositoryProvider.js';
 import { materializeEvidence } from '../../../src/services/evidenceHandles.js';
+import { EvidenceValidationError } from '../../../src/services/evidenceValidator.js';
 import { fakeRepository, validReport } from '../../fixtures/agentFixtures.js';
 
 function draft() {
@@ -126,4 +127,55 @@ it('suggests a fitting range and registers evidence only after the smaller retry
   expect(Buffer.byteLength(retry)).toBeLessThanOrEqual(1024);
   expect(JSON.parse(retry).evidenceHandle).toBe('read-1');
   expect(reads).toHaveLength(1);
+});
+
+it.each([
+  'REVERSED_RANGE',
+  'OUTSIDE_READ',
+  'MISSING_LINES',
+  'EMPTY_QUOTE',
+  'QUOTE_TOO_LONG',
+] as const)('explains %s using only backend numeric metadata', async (problem) => {
+  const repo = fakeRepository();
+  const file = await repo.readFile('src/customers.ts', 1, 1);
+  const report = draft();
+  report.summary = 'private rejected prose';
+  report.evidence[0]!.id = 'private-id';
+  if (problem === 'REVERSED_RANGE') report.evidence[0]!.startLine = 2;
+  if (problem === 'OUTSIDE_READ') report.evidence[0]!.endLine = 2;
+  if (problem === 'MISSING_LINES') file.lines = [];
+  if (problem === 'EMPTY_QUOTE') file.lines[0]!.text = '';
+  if (problem === 'QUOTE_TOO_LONG') file.lines[0]!.text = 'private source'.repeat(400);
+  let caught: unknown;
+  try {
+    materializeEvidence(report, repo.revision, [file]);
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(EvidenceValidationError);
+  if (!(caught instanceof EvidenceValidationError)) throw new Error('Expected rejection');
+  expect(caught.code).toBe('INVALID_EVIDENCE');
+  expect(caught.rangeDiagnostic).toMatchObject({
+    problem,
+    readIndex: 1,
+    available: { startLine: 1, endLine: 1 },
+  });
+  expect(JSON.stringify(caught.rangeDiagnostic)).not.toContain('private');
+  if (problem === 'QUOTE_TOO_LONG') expect(caught.rangeDiagnostic?.quoteCharacters).toBe(5600);
+});
+it('does not infer an available range from an unknown handle', async () => {
+  const repo = fakeRepository();
+  const file = await repo.readFile('src/customers.ts', 1, 1);
+  const report = draft();
+  report.evidence[0]!.handle = 'private unknown handle';
+  try {
+    materializeEvidence(report, repo.revision, [file]);
+    throw new Error('Expected rejection');
+  } catch (error) {
+    expect(error).toBeInstanceOf(EvidenceValidationError);
+    if (!(error instanceof EvidenceValidationError)) throw error;
+    expect(error.reason).toBe('UNKNOWN_HANDLE');
+    expect(error.rangeDiagnostic).toBeUndefined();
+    expect(JSON.stringify(error)).not.toContain('private');
+  }
 });

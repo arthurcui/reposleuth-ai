@@ -150,6 +150,7 @@ export async function investigate(options: {
       emit('validation_failed', {
         reason: error.reason,
         evidenceIndex: error.evidenceIndex ?? null,
+        ...(error.rangeDiagnostic ? { range: error.rangeDiagnostic } : {}),
       });
     throw error;
   }
