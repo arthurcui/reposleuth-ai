@@ -11,6 +11,7 @@ import { CompletionModel } from './completion.js';
 import { instructions, modeInstructions, summaryInstructions } from './instructions.js';
 import { investigationModelSettings } from './models/settings.js';
 import { type ProviderConfig } from './provider.js';
+import { reportDiagnostics, reportText } from './reportResponse.js';
 import { createTools } from './tools.js';
 
 export async function investigate(options: {
@@ -55,28 +56,17 @@ export async function investigate(options: {
     options.remainingBudget,
     options.deadline,
     (response) => {
-      const text = response.output
-        .flatMap((item) =>
-          item.type === 'message' && Array.isArray(item.content)
-            ? item.content.flatMap((part) => (part.type === 'output_text' ? [part.text] : []))
-            : [],
-        )
-        .join('');
+      const text = reportText(response);
       let parsed: unknown;
       try {
         parsed = JSON.parse(text);
       } catch {
-        const metadata = z
-          .object({ choices: z.array(z.object({ finish_reason: z.string() })).optional() })
-          .safeParse(response.providerData);
         emit('validation_failed', {
           reason: 'INVALID_REPORT_JSON',
           characters: text.length,
           fenced: text.trimStart().startsWith('```'),
           endsObject: text.trimEnd().endsWith('}'),
-          finishReasons: metadata.success
-            ? metadata.data.choices?.map((choice) => choice.finish_reason)
-            : [],
+          ...reportDiagnostics(response),
         });
         throw new StopError('INVALID_REPORT');
       }
