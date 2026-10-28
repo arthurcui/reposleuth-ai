@@ -424,6 +424,20 @@ h3 {
   display: flex;
   gap: 12px;
 }
+.investigation-diagnostics {
+  border-top: 1px solid #29374c;
+  margin-top: 20px;
+  padding-top: 12px;
+  overflow-wrap: anywhere;
+}
+.investigation-diagnostics h3 {
+  font-size: 16px;
+}
+.investigation-diagnostics ul {
+  padding-left: 20px;
+  max-height: 240px;
+  overflow-y: auto;
+}
 details {
   border-top: 1px solid #29374c;
   margin-top: 18px;

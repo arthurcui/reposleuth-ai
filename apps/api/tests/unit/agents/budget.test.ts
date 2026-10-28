@@ -1,4 +1,5 @@
 /** Verifies model budget enforcement and usage accounting. */
+import { Usage } from '@openai/agents';
 import { expect, it, vi } from 'vitest';
 
 import { BudgetModel, DEFAULT_LIMITS, emptyUsage } from '../../../src/agents/budget.js';
@@ -42,3 +43,38 @@ it.each([
     expect(usage.usageIncomplete).toBe(false);
   },
 );
+
+it('stops on an underestimated provider input after recording actual usage', async () => {
+  const usage = emptyUsage();
+  const model = new BudgetModel(
+    {
+      getResponse: async () => ({
+        usage: new Usage({ inputTokens: 10000, outputTokens: 1 }),
+        output: [],
+      }),
+      getStreamedResponse: () => {
+        throw new Error('unused');
+      },
+    },
+    DEFAULT_LIMITS,
+    usage,
+    () => {},
+    () => {},
+    () => {},
+    undefined,
+    'openai',
+    'gpt-5.4-mini',
+  );
+  await expect(
+    model.getResponse({
+      input: 'Hello',
+      modelSettings: {},
+      tools: [],
+      handoffs: [],
+      outputType: 'text',
+      tracing: false,
+    }),
+  ).rejects.toMatchObject({ code: 'INPUT_ESTIMATE_EXCEEDED' });
+  expect(usage.inputTokens).toBe(10000);
+  expect(usage.usageIncomplete).toBe(false);
+});

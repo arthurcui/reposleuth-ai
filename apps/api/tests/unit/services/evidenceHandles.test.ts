@@ -1,12 +1,42 @@
 /** Verifies citations are constructed solely from returned run-scoped source reads. */
+import { RunContext } from '@openai/agents';
 import { expect, it } from 'vitest';
 
+import { createTools } from '../../../src/agents/tools.js';
+import type { SourceFile } from '../../../src/github/RepositoryProvider.js';
 import { materializeEvidence } from '../../../src/services/evidenceHandles.js';
 import { fakeRepository, validReport } from '../../fixtures/agentFixtures.js';
 
 function draft() {
   return { ...validReport(), evidence: [{ id: 'e1', handle: 'read-1', startLine: 1, endLine: 1 }] };
 }
+it('withholds oversized UTF-8 source without issuing a handle when the allowance shrinks', async () => {
+  const repo = fakeRepository();
+  const file = await repo.readFile('src/customers.ts', 1, 1);
+  file.lines[0]!.text = 'é'.repeat(700);
+  repo.readFile = async () => file;
+  const reads: SourceFile[] = [];
+  let limit = 1024;
+  const read = createTools(
+    repo,
+    reads,
+    () => {},
+    () => {},
+    24,
+    () => true,
+    () => limit,
+  ).find((t) => t.name === 'read_file')!;
+  const args = JSON.stringify({ path: file.path, startLine: 1, endLine: 1 });
+  expect(JSON.parse(String(await read.invoke(new RunContext(), args)))).toMatchObject({
+    error: 'OUTPUT_LIMIT',
+  });
+  expect(reads).toHaveLength(0);
+  limit = 8000;
+  expect(JSON.parse(String(await read.invoke(new RunContext(), args)))).toMatchObject({
+    evidenceHandle: 'read-1',
+  });
+  expect(reads).toHaveLength(1);
+});
 it('constructs exact source metadata and preserves explanatory references', async () => {
   const repo = fakeRepository();
   const file = await repo.readFile('src/customers.ts', 1, 1);

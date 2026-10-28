@@ -2,6 +2,8 @@
 import type { Model, ModelRequest, ModelResponse } from '@openai/agents';
 import type { InvestigationUsage } from '@reposleuth/shared';
 
+import { estimateInputTokens } from './tokens.js';
+
 export const MODEL = 'gpt-6-luna';
 // Standard global rates checked 2026-10-22. Conservatively price every input as a cache write.
 export const RATES = { input: 0.125 / 1_000_000, output: 0.5 / 1_000_000 };
@@ -29,16 +31,15 @@ export const emptyUsage = (): InvestigationUsage => ({
 });
 
 /** Shared conservative input estimate for exploration planning and hard request admission. */
-export function inputTokenBound(request: ModelRequest): number {
-  return (
-    Buffer.byteLength(
-      JSON.stringify({
-        input: request.input,
-        system: request.systemInstructions,
-        tools: request.tools,
-        output: request.outputType,
-      }),
-    ) + 4096
+export function inputTokenBound(request: ModelRequest, model?: string): number {
+  return estimateInputTokens(
+    JSON.stringify({
+      input: request.input,
+      system: request.systemInstructions,
+      tools: request.tools,
+      output: request.outputType,
+    }),
+    model,
   );
 }
 
@@ -52,13 +53,14 @@ export class BudgetModel implements Model {
     private readonly check: () => void,
     private readonly rates = RATES,
     private readonly provider: 'openai' | 'gemini' = 'openai',
+    private readonly modelName?: string,
+    private readonly measured?: (estimated: number, actual: number) => void,
   ) {}
 
   async getResponse(request: ModelRequest): Promise<ModelResponse> {
     this.check();
-    // Full history is sent each time. UTF-8 bytes + overhead is a conservative input estimate,
-    // not a tokenizer or an invoice guarantee; no server-side conversation state is used.
-    const inputBound = inputTokenBound(request);
+    // Full history is estimated with framing and safety padding; this is not a billing guarantee.
+    const inputBound = inputTokenBound(request, this.modelName);
     const bound = inputBound * this.rates.input + this.limits.outputTokens * this.rates.output;
     if (this.usage.requests >= this.limits.turns) throw new StopError('BUDGET_EXCEEDED_REQUESTS');
     if (inputBound > 80000) throw new StopError('BUDGET_EXCEEDED_CONTEXT');
@@ -120,6 +122,7 @@ export class BudgetModel implements Model {
       input + output === 0
     )
       throw new StopError('USAGE_UNAVAILABLE');
+    this.measured?.(inputBound, input);
     this.usage.inputTokens += input;
     this.usage.outputTokens += output;
     this.usage.estimatedCostUsd += input * this.rates.input + output * this.rates.output;
@@ -131,6 +134,7 @@ export class BudgetModel implements Model {
       throw new StopError('BUDGET_EXCEEDED_TOKENS');
     if (this.usage.estimatedCostUsd > this.limits.costUsd)
       throw new StopError('BUDGET_EXCEEDED_COST');
+    if (input > inputBound) throw new StopError('INPUT_ESTIMATE_EXCEEDED');
     return response;
   }
   getStreamedResponse(): ReturnType<Model['getStreamedResponse']> {

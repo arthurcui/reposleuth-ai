@@ -55,6 +55,19 @@ same validation. Final requests remain inside the original limits—provider err
 cancellation, slow requests, or a budget too small for even one response can still
 prevent a report. No extra budget or automatic retry is added.
 
+Reserve planning estimates the final request with tools removed and adapts the next
+tool-result allowance to the remaining cost, token and context capacity. Results that
+exceed that allowance are withheld without issuing evidence handles; the agent can
+narrow the read. If less than 1 KiB remains for a useful tool result, it reports from
+existing evidence. This avoids reserving a large hypothetical transcript before any
+source has been examined, while retaining hard admission checks on every model call.
+
+Stopped investigations show the specific error, relevant configured limit, last
+recorded tool or reporting step, and source ranges read at the pinned commit.
+The same diagnostics are available when reopening history. Partial reports show
+why exploration ended; rejected output is never presented as an accepted report.
+Older runs without source-read events explicitly indicate that details are unavailable.
+
 ## Requirements
 
 - Node.js 22.13+, 24.x, or 26+ and npm (Node 24 LTS recommended).
@@ -436,9 +449,20 @@ This test has a US$0.02 estimated per-run ceiling and a separate persistent US$0
 reservation ledger in `data/live-smoke.sqlite`. It prints only run status and usage;
 inspect the database for the persisted report. It does not access or modify GitHub.
 
-Current live verification: the API was reached, but returned HTTP 429 with
-`credit_balance_exhausted` / `insufficient_quota`. Successful live report generation
-remains unverified. The app now classifies this as `OPENAI_QUOTA`, distinct from
-`OPENAI_RATE_LIMIT`. Add credits through your API billing settings and rerun the
-explicit smoke command when ready. Failed attempts retain a conservative reservation;
-zero reported tokens does not imply a verified zero invoice charge.
+Live checks have produced validated reports with GPT-5.4 mini and Gemini. Automated
+benchmark grades are not proof that proposed fixes work; no repository tests are
+executed. Quota failures are classified as `OPENAI_QUOTA`, distinct from rate limits.
+Failed requests retain their reservations; zero reported tokens do not establish a
+zero invoice charge.
+
+Token admission uses a local o200k_base tokenizer for GPT-5 names, with a 30% margin
+and 2,048 tokens for framing. Other model families retain the UTF-8 byte estimate.
+These are padded estimates, not exact provider counts or billing guarantees. Actual
+usage is recorded after each response; an underestimated input stops further calls.
+The issue fetched during preflight is included as untrusted input to avoid a redundant
+lookup. Search guidance favors reading a discovered path before another search.
+
+`find_files` searches filenames and paths case-insensitively within the bounded root
+listing, preserving truncation warnings. `list_files` accepts an empty prefix, `.` or
+`./` for the repository root. The agent is instructed to follow referenced class names
+to their implementation before reporting a cause.

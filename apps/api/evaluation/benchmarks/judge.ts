@@ -49,6 +49,7 @@ export function createJudge(
         check,
         provider.rates,
         provider.provider,
+        provider.model,
       );
       const agent = new Agent({
         name: 'Benchmark evaluator',

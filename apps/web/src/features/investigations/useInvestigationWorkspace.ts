@@ -132,7 +132,7 @@ export function useInvestigationWorkspace() {
         setEvents((previous) =>
           previous.some((item) => item.id === parsed.id)
             ? previous
-            : [...previous, parsed].sort((a, b) => a.id - b.id).slice(-200),
+            : [...previous, parsed].sort((a, b) => a.id - b.id).slice(-1000),
         );
         if (parsed.type === 'terminal') source.close();
         refresh().catch((cause) => {

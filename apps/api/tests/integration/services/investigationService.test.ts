@@ -40,6 +40,14 @@ async function finish(service: InvestigationService, id: string) {
 }
 
 describe('investigation lifecycle and API', () => {
+  it('passes the validated preflight issue into the first model request', async () => {
+    const model = new ScriptedModel();
+    const service = make(() => model);
+    const run = await finish(service, service.start(request).id);
+    expect(run.status).toBe('completed');
+    expect(JSON.stringify(model.requests[0]!.input)).toContain('preflightIssue');
+    expect(JSON.stringify(model.requests[0]!.input)).toContain('Untrusted issue text');
+  });
   it('does not call the model after a timed-out issue preflight eventually resolves', async () => {
     const repository = fakeRepository();
     const original = repository.getIssue;

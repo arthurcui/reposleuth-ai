@@ -71,7 +71,17 @@ export function errorMessage(code: string): string {
     PROCESS_RESTARTED: 'The API restarted during this investigation. Start a new run to continue.',
     SERVICE_STOPPED: 'The API stopped before this investigation finished.',
     INVALID_EVIDENCE: 'Source references could not be validated. No report was published.',
-    BUDGET_EXCEEDED: 'The investigation stopped at its configured budget limit.',
+    BUDGET_EXCEEDED:
+      'The server’s persistent spending allowance could not reserve another model request. Starting another run does not reset this allowance.',
+    INVALID_REPORT: 'The model returned an invalid report. No report was published.',
+    INPUT_ESTIMATE_EXCEEDED:
+      'The provider reported more input tokens than reserved. The investigation stopped to protect the remaining budget.',
+    MODEL_REQUEST_FAILED:
+      'The model request failed. Check provider availability before starting a new investigation.',
+    USAGE_UNAVAILABLE:
+      'The provider did not return usable token accounting. The run stopped to protect its budget.',
+    INVESTIGATION_FAILED:
+      'The investigation stopped unexpectedly. Check the recorded activity and server logs before starting a new run.',
     BUDGET_EXCEEDED_REQUESTS:
       'The model request limit was reached. Narrow the investigation to a specific issue or symptom.',
     BUDGET_EXCEEDED_CONTEXT:

@@ -128,11 +128,12 @@ export class InvestigationService {
         record.commitSha = repository.revision.commitSha;
         save();
         emit('revision', { commitSha: record.commitSha });
+        let preflightIssue;
         // Validate an explicitly requested issue before reserving money or calling the model.
         if (record.request.issueNumber !== undefined) {
           emit('tool_started', { name: 'get_issue', phase: 'preflight' });
           try {
-            await repository.getIssue(record.request.issueNumber);
+            preflightIssue = await repository.getIssue(record.request.issueNumber);
             emit('tool_finished', { name: 'get_issue', phase: 'preflight', outcome: 'success' });
           } catch (error) {
             const code = error instanceof RepositoryError ? error.code : 'TOOL_FAILED';
@@ -153,6 +154,7 @@ export class InvestigationService {
         }
         return investigate({
           provider: selected,
+          preflightIssue,
           repository,
           request: record.request,
           model: this.model(selected),

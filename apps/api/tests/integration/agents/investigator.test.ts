@@ -9,6 +9,32 @@ import { validateEvidence } from '../../../src/services/evidenceValidator.js';
 import { fakeRepository, ScriptedModel, validReport } from '../../fixtures/agentFixtures.js';
 
 describe('SDK investigation loop', () => {
+  it('lets GPT-5.4 mini retrieve evidence within unchanged Standard ceilings', async () => {
+    const model = new ScriptedModel();
+    const usage = emptyUsage();
+    const report = await investigate({
+      repository: fakeRepository(),
+      request: { repository: 'owner/repo', question: 'Why is loading slow?', issueNumber: 42 },
+      provider: {
+        provider: 'openai',
+        model: 'gpt-5.4-mini',
+        keyVariable: 'OPENAI_API_KEY',
+        rates: { input: 0.75 / 1e6, output: 4.5 / 1e6 },
+      },
+      model,
+      limits: DEFAULT_LIMITS,
+      usage,
+      signal: new AbortController().signal,
+      reserve: () => {},
+      saveUsage: () => {},
+      emit: () => {},
+    });
+    expect(model.requests[0]!.tools.length).toBeGreaterThan(0);
+    expect(model.requests[0]!.modelSettings.toolChoice).not.toBe('none');
+    expect(report.evidence).toHaveLength(1);
+    expect(usage.requests).toBe(4);
+    expect(usage.estimatedCostUsd).toBeLessThan(DEFAULT_LIMITS.costUsd);
+  });
   it('finishes with validated partial findings on the final allowed request', async () => {
     const model = new ScriptedModel();
     const report = await investigate({
