@@ -263,6 +263,24 @@ describe('investigation UI', () => {
     render(<App />);
     expect(await screen.findByText(/API credits are exhausted/)).toBeTruthy();
     expect(screen.getByText(/No validated report/)).toBeTruthy();
+    act(() => {
+      Stream.latest.dispatchEvent(
+        new MessageEvent('source_read', {
+          data: JSON.stringify({
+            id: 30,
+            investigationId: 'run-1',
+            at: demo.createdAt,
+            type: 'source_read',
+            data: { path: 'src/example.ts', startLine: 2, endLine: 5, commitSha: demo.commitSha },
+          }),
+        }),
+      );
+      Stream.latest.emit('tool_started', 31);
+      Stream.latest.emit('terminal', 32);
+    });
+    expect(await screen.findByText('Recorded source reads (1)')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'src/example.ts:2-5', hidden: true })).toBeTruthy();
+    expect(screen.getByText(/Read source file · started; completion not recorded/)).toBeTruthy();
   });
   it('recovers terminal status by polling if the terminal event arrives during a fetch', async () => {
     vi.useFakeTimers();

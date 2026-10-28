@@ -15,10 +15,52 @@ const request: ModelRequest = {
   tracing: false,
 };
 
+it('shrinks the tool-result allowance before stopping exploration, without raising limits', async () => {
+  const getResponse = vi.fn<Model['getResponse']>(async () => ({ usage: new Usage(), output: [] }));
+  const model = new CompletionModel(
+    {
+      getResponse,
+      getStreamedResponse: () => {
+        throw new Error('unused');
+      },
+    },
+    { ...DEFAULT_LIMITS, costUsd: 0.04 },
+    emptyUsage(),
+    () => {},
+    { input: 0.75 / 1e6, output: 4.5 / 1e6 },
+  );
+  await model.getResponse({ ...request, input: 'x'.repeat(5000) });
+  expect(model.reason).toBeUndefined();
+  expect(model.toolOutputBytes).toBeGreaterThanOrEqual(1024);
+  expect(model.toolOutputBytes).toBeLessThan(8000);
+  expect(getResponse.mock.calls[0]![0].modelSettings.toolChoice).not.toBe('none');
+});
+
+it('switches to reporting when the persistent allowance cannot fund exploration and a final request', async () => {
+  const getResponse = vi.fn<Model['getResponse']>(async () => ({ usage: new Usage(), output: [] }));
+  const model = new CompletionModel(
+    {
+      getResponse,
+      getStreamedResponse: () => {
+        throw new Error('unused');
+      },
+    },
+    DEFAULT_LIMITS,
+    emptyUsage(),
+    () => {},
+    undefined,
+    () => 0.002,
+  );
+  await model.getResponse(request);
+  expect(model.reason).toBe('LIFETIME_COST_RESERVE');
+  expect(model.allowTool()).toBe(false);
+  expect(getResponse.mock.calls[0]![0].modelSettings.toolChoice).toBe('none');
+});
+
 it.each([
   ['REQUEST_RESERVE', { requests: 11 }, {}],
-  ['TOKEN_RESERVE', { inputTokens: 70000 }, {}],
-  ['COST_RESERVE', {}, { costUsd: 0.005 }],
+  ['TOKEN_RESERVE', { inputTokens: 85000 }, {}],
+  ['COST_RESERVE', {}, { costUsd: 0.003 }],
 ] as const)('reserves the final response for %s', async (reason, prior, overrides) => {
   const usage = { ...emptyUsage(), ...prior };
   const getResponse = vi.fn(async () => ({

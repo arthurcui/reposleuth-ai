@@ -16,8 +16,10 @@ export function createTools(
   emit: (type: string, data: Record<string, unknown>) => void,
   maxTools: number,
   allowTool?: () => boolean,
-  maxOutputBytes = 120000,
+  maxOutputBytes: number | (() => number) = 120000,
 ) {
+  const outputByteLimit = () =>
+    typeof maxOutputBytes === 'number' ? maxOutputBytes : maxOutputBytes();
   let calls = 0;
   async function invoke(name: string, action: () => Promise<unknown>) {
     check();
@@ -33,7 +35,7 @@ export function createTools(
       const value = await action();
       check();
       const output = JSON.stringify(value);
-      if (output.length > 30000 || Buffer.byteLength(output) > maxOutputBytes) {
+      if (output.length > 30000 || Buffer.byteLength(output) > outputByteLimit()) {
         emit('tool_finished', { name, outcome: 'output_limit' });
         return JSON.stringify({
           error: 'OUTPUT_LIMIT',
@@ -65,10 +67,37 @@ export function createTools(
     }),
     tool({
       name: 'list_files',
-      description: 'List eligible source paths at the pinned commit; narrow with a prefix.',
+      description:
+        'List source paths. Use prefix empty string for repository root, or an exact directory prefix from returned paths. Do not guess a src/ directory.',
       parameters: z.object({ prefix: z.string().max(1024) }),
       errorFunction: null,
-      execute: ({ prefix }) => invoke('list_files', () => repository.listFiles(prefix)),
+      execute: ({ prefix }) =>
+        invoke('list_files', () =>
+          repository.listFiles(prefix === '.' || prefix === './' ? '' : prefix),
+        ),
+    }),
+    tool({
+      name: 'find_files',
+      description:
+        'Find source paths by case-insensitive filename or path substring, such as a class name seen in source. Searches the bounded root listing; incomplete results are marked. Read a returned path next.',
+      parameters: z.object({ query: z.string().min(2).max(200) }),
+      errorFunction: null,
+      execute: ({ query }) =>
+        invoke('find_files', async () => {
+          const listing = await repository.listFiles('');
+          const matches = listing.items.filter((path) =>
+            path.toLowerCase().includes(query.toLowerCase()),
+          );
+          return {
+            ...listing,
+            items: matches.slice(0, 40),
+            truncated: listing.truncated || matches.length > 40,
+            warnings: [
+              ...listing.warnings,
+              ...(matches.length > 40 ? ['Matching paths capped at 40; narrow the query.'] : []),
+            ],
+          };
+        }),
     }),
     tool({
       name: 'search_code',
@@ -94,7 +123,7 @@ export function createTools(
           // Register only content actually returned to the model, including handle overhead.
           if (
             JSON.stringify(result).length <= 30000 &&
-            Buffer.byteLength(JSON.stringify(result)) <= maxOutputBytes
+            Buffer.byteLength(JSON.stringify(result)) <= outputByteLimit()
           ) {
             check();
             reads.push(file);

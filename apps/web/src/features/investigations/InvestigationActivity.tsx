@@ -3,6 +3,7 @@ import { investigationModes } from '@reposleuth/shared';
 
 import { demoCases } from '../demo/demo';
 import { errorMessage } from './client';
+import { InvestigationDiagnostics } from './InvestigationDiagnostics';
 import type { InvestigationWorkspace } from './useInvestigationWorkspace';
 export function InvestigationActivity({ workspace }: { workspace: InvestigationWorkspace }) {
   const {
@@ -183,7 +184,10 @@ export function InvestigationActivity({ workspace }: { workspace: InvestigationW
                 conservatively.
               </p>
             )}
-            {run.errorCode && <p className="notice error">{errorMessage(run.errorCode)}</p>}
+            {run.errorCode && active && (
+              <p className="notice error">{errorMessage(run.errorCode)}</p>
+            )}
+            {!showingDemo && <InvestigationDiagnostics run={run} events={events} />}
             {run.commitSha && (
               <p className="muted small">
                 Pinned commit: <code>{run.commitSha.slice(0, 12)}</code>
@@ -228,12 +232,6 @@ export function InvestigationActivity({ workspace }: { workspace: InvestigationW
               </li>
             ))}
           </ol>
-        )}
-        {run && !active && !run.report && (
-          <p className="muted">
-            No validated report was produced. Review the status above before starting another
-            investigation.
-          </p>
         )}
       </section>
     </>

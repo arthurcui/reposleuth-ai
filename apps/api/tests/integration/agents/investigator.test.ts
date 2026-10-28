@@ -9,6 +9,65 @@ import { validateEvidence } from '../../../src/services/evidenceValidator.js';
 import { fakeRepository, ScriptedModel, validReport } from '../../fixtures/agentFixtures.js';
 
 describe('SDK investigation loop', () => {
+  it('validates the final report instead of concatenating earlier assistant commentary', async () => {
+    const scripted = new ScriptedModel();
+    const delegate: Model = {
+      getResponse: async (request) => {
+        const response = await scripted.getResponse(request);
+        if (!response.output.some((item) => item.type === 'function_call')) {
+          response.output.unshift({
+            type: 'message',
+            role: 'assistant',
+            status: 'completed',
+            content: [{ type: 'output_text', text: 'Earlier progress commentary, not JSON.' }],
+          });
+        }
+        return response;
+      },
+      getStreamedResponse: () => {
+        throw new Error('unused');
+      },
+    };
+    const report = await investigate({
+      repository: fakeRepository(),
+      request: { repository: 'owner/repo', question: 'Why slow?' },
+      model: delegate,
+      limits: DEFAULT_LIMITS,
+      usage: emptyUsage(),
+      signal: new AbortController().signal,
+      reserve: () => {},
+      saveUsage: () => {},
+      emit: () => {},
+    });
+    expect(report.evidence).toHaveLength(1);
+    expect(report.summary).toBe(validReport().summary);
+  });
+  it('lets GPT-5.4 mini retrieve evidence within unchanged Standard ceilings', async () => {
+    const model = new ScriptedModel();
+    const usage = emptyUsage();
+    const report = await investigate({
+      repository: fakeRepository(),
+      request: { repository: 'owner/repo', question: 'Why is loading slow?', issueNumber: 42 },
+      provider: {
+        provider: 'openai',
+        model: 'gpt-5.4-mini',
+        keyVariable: 'OPENAI_API_KEY',
+        rates: { input: 0.75 / 1e6, output: 4.5 / 1e6 },
+      },
+      model,
+      limits: DEFAULT_LIMITS,
+      usage,
+      signal: new AbortController().signal,
+      reserve: () => {},
+      saveUsage: () => {},
+      emit: () => {},
+    });
+    expect(model.requests[0]!.tools.length).toBeGreaterThan(0);
+    expect(model.requests[0]!.modelSettings.toolChoice).not.toBe('none');
+    expect(report.evidence).toHaveLength(1);
+    expect(usage.requests).toBe(4);
+    expect(usage.estimatedCostUsd).toBeLessThan(DEFAULT_LIMITS.costUsd);
+  });
   it('finishes with validated partial findings on the final allowed request', async () => {
     const model = new ScriptedModel();
     const report = await investigate({
