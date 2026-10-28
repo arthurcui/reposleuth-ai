@@ -467,7 +467,9 @@ The issue fetched during preflight is included as untrusted input to avoid a red
 lookup. Search guidance favors reading a discovered path before another search.
 
 `find_files` searches filenames and paths case-insensitively within a bounded
-directory listing, preserving truncation warnings. Both `find_files` and
+tree of up to 5,000 eligible paths, returning at most 40 matches after filtering
+by scope and query and preserving truncation warnings. No source blobs are
+downloaded for filename discovery. Both `find_files` and
 `search_code` accept a model-selected `scope`, such as `packages/solid-query`;
 empty or omitted scope searches from the root. File/byte limits apply after scope
 filtering, while total GitHub requests and source-cache limits stay shared.

@@ -35,6 +35,16 @@ export function fixtureRepository(test: EvalCase): RepositoryProvider {
       truncated: false,
       warnings: [],
     }),
+    findFiles: async (query, scope = '') => ({
+      ...revision,
+      items:
+        (!scope || test.path.startsWith(scope.replace(/\/$/, '') + '/')) &&
+        test.path.toLowerCase().includes(query.toLowerCase())
+          ? [test.path]
+          : [],
+      truncated: false,
+      warnings: [],
+    }),
     searchCode: async (query) => ({
       ...revision,
       items: lines.flatMap((text, index) =>

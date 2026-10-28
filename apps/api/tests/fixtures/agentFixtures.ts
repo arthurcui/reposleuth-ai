@@ -62,6 +62,16 @@ export function fakeRepository(): RepositoryProvider {
       truncated: false,
       warnings: [],
     }),
+    findFiles: async (query, scope = '') => ({
+      ...revision,
+      items:
+        (!scope || 'src/customers.ts'.startsWith(scope.replace(/\/$/, '') + '/')) &&
+        'src/customers.ts'.toLowerCase().includes(query.toLowerCase())
+          ? ['src/customers.ts']
+          : [],
+      truncated: false,
+      warnings: [],
+    }),
     searchCode: async () => ({
       ...revision,
       items: [

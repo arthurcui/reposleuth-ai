@@ -2,7 +2,6 @@
 import { tool } from '@openai/agents';
 import { z } from 'zod';
 
-import { directoryScope } from '../github/repositoryIndex.js';
 import {
   RepositoryError,
   type RepositoryProvider,
@@ -130,26 +129,11 @@ export function createTools(
     tool({
       name: 'find_files',
       description:
-        'Find source paths by case-insensitive filename or path substring, such as a class name seen in source. Set scope to a known package/directory (empty or null for root). Searches that bounded listing; incomplete results are marked. Read a returned path next.',
+        'Find source paths by case-insensitive filename or path substring, such as a class name seen in source. Set scope to a known package/directory (empty or null for root). Searches all eligible paths in the bounded tree (up to 5000) before returning at most 40 matches; incomplete results are marked. Read a returned path next.',
       parameters: z.object({ query: z.string().min(2).max(200), scope }),
       errorFunction: null,
       execute: ({ query, scope }) =>
-        invoke('find_files', async () => {
-          const directory = directoryScope(scope ?? '');
-          const listing = await repository.listFiles(directory ? `${directory}/` : '');
-          const matches = listing.items.filter((path) =>
-            path.toLowerCase().includes(query.toLowerCase()),
-          );
-          return {
-            ...listing,
-            items: matches.slice(0, 40),
-            truncated: listing.truncated || matches.length > 40,
-            warnings: [
-              ...listing.warnings,
-              ...(matches.length > 40 ? ['Matching paths capped at 40; narrow the query.'] : []),
-            ],
-          };
-        }),
+        invoke('find_files', () => repository.findFiles(query, scope ?? '')),
     }),
     tool({
       name: 'search_code',

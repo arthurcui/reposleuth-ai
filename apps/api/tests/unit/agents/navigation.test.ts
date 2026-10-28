@@ -23,9 +23,9 @@ it.each(['.', './', ''])(
 );
 it('finds referenced names case-insensitively and preserves incomplete-list warnings', async () => {
   const repo = fakeRepository();
-  repo.listFiles = async () => ({
+  repo.findFiles = async () => ({
     ...repo.revision,
-    items: ['Core/InvoiceService.cs', 'Program.cs'],
+    items: ['Core/InvoiceService.cs'],
     truncated: true,
     warnings: ['Tree incomplete'],
   });
@@ -45,31 +45,9 @@ it('finds referenced names case-insensitively and preserves incomplete-list warn
     warnings: ['Tree incomplete'],
   });
 });
-it('caps matching paths and marks omitted matches', async () => {
-  const repo = fakeRepository();
-  repo.listFiles = async () => ({
-    ...repo.revision,
-    items: Array.from({ length: 45 }, (_, i) => `src/Service${i}.ts`),
-    truncated: false,
-    warnings: [],
-  });
-  const tool = createTools(
-    repo,
-    [],
-    () => {},
-    () => {},
-    10,
-  ).find((t) => t.name === 'find_files')!;
-  const result = JSON.parse(
-    String(await tool.invoke(new RunContext(), JSON.stringify({ query: 'Service' }))),
-  );
-  expect(result.items).toHaveLength(40);
-  expect(result.truncated).toBe(true);
-});
-
 it('passes model-selected scopes to discovery and search without guessing a package', async () => {
   const repo = fakeRepository();
-  const list = vi.spyOn(repo, 'listFiles');
+  const list = vi.spyOn(repo, 'findFiles');
   const search = vi.spyOn(repo, 'searchCode');
   const tools = createTools(
     repo,
@@ -81,7 +59,7 @@ it('passes model-selected scopes to discovery and search without guessing a pack
   await tools
     .find((t) => t.name === 'find_files')!
     .invoke(new RunContext(), JSON.stringify({ query: 'Service', scope: 'packages/api' }));
-  expect(list).toHaveBeenCalledWith('packages/api/');
+  expect(list).toHaveBeenCalledWith('Service', 'packages/api');
   await tools
     .find((t) => t.name === 'search_code')!
     .invoke(new RunContext(), JSON.stringify({ query: 'enabled', scope: 'packages/client' }));

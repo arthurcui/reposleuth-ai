@@ -175,6 +175,32 @@ export class OctokitProvider implements RepositoryProvider {
     };
   }
 
+  /** Match metadata before applying the output cap; no source blobs are downloaded. */
+  async findFiles(query: string, scope = ''): Promise<BoundedResult<string>> {
+    const directory = directoryScope(scope);
+    if (query.length < 2 || query.length > 200 || /[\r\n\0]/.test(query))
+      throw new RepositoryError(
+        'INVALID_QUERY',
+        'Use a filename query of 2�200 characters on one line.',
+      );
+    const { files, warnings } = await this.files();
+    const needle = query.toLowerCase();
+    const matches = files.filter(
+      (file) =>
+        (!directory || file.path.startsWith(`${directory}/`)) &&
+        file.path.toLowerCase().includes(needle),
+    );
+    return {
+      ...this.revision,
+      items: matches.slice(0, 40).map((file) => file.path),
+      truncated: warnings.length > 0 || matches.length > 40,
+      warnings: [
+        ...warnings,
+        ...(matches.length > 40 ? ['Matching paths capped at 40; narrow the query or scope.'] : []),
+      ],
+    };
+  }
+
   private async source(file: TreeFile): Promise<string[]> {
     const cached = this.cache.get(file.path);
     if (cached) return cached;

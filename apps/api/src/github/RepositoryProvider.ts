@@ -58,6 +58,7 @@ export interface RepositoryProvider {
   readonly revision: Readonly<RepositoryRevision>;
   getIssue(number: number): Promise<IssueDetails>;
   listFiles(prefix?: string, offset?: number): Promise<BoundedResult<string>>;
+  findFiles(query: string, scope?: string): Promise<BoundedResult<string>>;
   searchCode(query: string, scope?: string): Promise<BoundedResult<CodeMatch>>;
   readFile(path: string, startLine: number, endLine: number): Promise<SourceFile>;
   getCommits(path: string): Promise<BoundedResult<CommitSummary>>;

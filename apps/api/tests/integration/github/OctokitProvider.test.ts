@@ -598,3 +598,84 @@ describe('range recovery', () => {
     await expect(repo.listFiles('', -1)).rejects.toMatchObject({ code: 'INVALID_OFFSET' });
   });
 });
+
+describe('metadata filename discovery', () => {
+  function treeFixture(paths: string[], truncated = false) {
+    return fixture((url) =>
+      url.pathname.endsWith(`/git/trees/${TREE_SHA}`)
+        ? {
+            data: {
+              truncated,
+              tree: paths.map((path) => ({
+                path,
+                type: 'blob',
+                mode: '100644',
+                sha: BLOB_SHA,
+                size: 5,
+              })),
+            },
+          }
+        : undefined,
+    );
+  }
+  it('finds later paths at root and in scope without downloading source blobs', async () => {
+    const target = 'packages/client/z/BookingService.ts';
+    const f = treeFixture([
+      ...Array.from({ length: 600 }, (_, i) => `packages/client/a/file${i}.ts`),
+      target,
+      'packages/client-extra/BookingService.ts',
+    ]);
+    const repo = await f.connect();
+    expect((await repo.listFiles('packages/client/')).items).not.toContain(target);
+    expect((await repo.findFiles('bookingservice')).items).toHaveLength(2);
+    expect((await repo.findFiles('BOOKINGSERVICE', 'packages/client')).items).toEqual([target]);
+    expect((await repo.findFiles('bookingservice', 'packages/client/')).items).toEqual([target]);
+    expect(f.calls.filter((url) => url.pathname.includes('/git/trees/'))).toHaveLength(1);
+    expect(f.calls.some((url) => url.pathname.includes('/git/blobs/'))).toBe(false);
+  });
+  it('caps matches after filtering and preserves incomplete-tree warnings even without matches', async () => {
+    const repo = await treeFixture(
+      Array.from({ length: 45 }, (_, i) => `src/Service${i}.ts`),
+      true,
+    ).connect();
+    const result = await repo.findFiles('service');
+    expect(result.items).toHaveLength(40);
+    expect(result.truncated).toBe(true);
+    expect(result.warnings.join(' ')).toMatch(/truncated.*capped/);
+    const empty = await repo.findFiles('absent');
+    expect(empty.items).toEqual([]);
+    expect(empty.truncated).toBe(true);
+  });
+  it('never searches beyond the existing 5000-file tree bound', async () => {
+    const repo = await treeFixture([
+      ...Array.from({ length: 5000 }, (_, i) => `src/file${i}.ts`),
+      'src/HiddenService.ts',
+    ]).connect();
+    const result = await repo.findFiles('HiddenService');
+    expect(result.items).toEqual([]);
+    expect(result.truncated).toBe(true);
+    expect(result.warnings.join(' ')).toContain('tree limits');
+  });
+  it.each(['../src', 'src/../other', '/src', 'src\\child'])(
+    'rejects unsafe scope %s before GitHub reads',
+    async (scope) => {
+      const f = treeFixture([]);
+      const repo = await f.connect();
+      const before = f.calls.length;
+      await expect(repo.findFiles('service', scope)).rejects.toMatchObject({
+        code: 'INVALID_PATH',
+      });
+      expect(f.calls).toHaveLength(before);
+    },
+  );
+  it.each(['x', 'x'.repeat(201), 'bad\nquery', 'bad\0query'])(
+    'rejects invalid filename query before GitHub reads',
+    async (query) => {
+      const f = treeFixture([]);
+      const repo = await f.connect();
+      const before = f.calls.length;
+      await expect(repo.findFiles(query)).rejects.toMatchObject({ code: 'INVALID_QUERY' });
+      expect(f.calls).toHaveLength(before);
+    },
+  );
+});

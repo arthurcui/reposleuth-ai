@@ -111,8 +111,9 @@ is excluded. Empty, omitted, or null scope means the repository root. The model
 chooses the scope from issue context or discovered paths; RepoSleuth does not pick
 a package based on benchmark answers.
 
-Discovery remains bounded: `find_files` searches the first 500 eligible paths in
-the selected directory, and `search_code` indexes at most 40 files / 2 MiB within
+Discovery remains bounded: `find_files` matches against all eligible paths in the
+cached tree (up to 5,000), filtering by scope and query before returning at most
+40 matches. It does not download source blobs. `search_code` indexes at most 40 files / 2 MiB within
 that directory. Source-cache and total GitHub request limits remain shared across
 scopes; changing directories does not reset those limits. The repository tree is
 also bounded, and warnings are retained. A missing result is not proof that a file
