@@ -42,4 +42,4 @@ export const modeInstructions = {
 export const summaryInstructions = `Provide a concise evidence-based reasoningSummary: assessment with evidenceIds, alternatives considered, counterEvidence checked, and limitations. This is an engineering rationale, not a private chain-of-thought transcript. Reference only validated source evidence IDs. Empty evidenceIds mean an unverified possibility or an explicit coverage gap; say so. Do not claim absence of counter-evidence proves a cause. If the symptom is missing, report the limitation without inventing a defect.`;
 
 /** Identifies the investigator protocol for reproducible benchmark comparisons. */
-export const PROMPT_VERSION = 'navigation-recovery-v9';
+export const PROMPT_VERSION = 'preflight-reuse-v10';

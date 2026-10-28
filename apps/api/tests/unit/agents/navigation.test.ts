@@ -91,3 +91,37 @@ it('passes model-selected scopes to discovery and search without guessing a pack
     .invoke(new RunContext(), JSON.stringify({ query: 'enabled' }));
   expect(search).toHaveBeenLastCalledWith('enabled', '');
 });
+
+it('avoids repeating supplied issue content but still permits related issue reads', async () => {
+  const repo = fakeRepository();
+  const get = vi.spyOn(repo, 'getIssue');
+  const tool = createTools(
+    repo,
+    [],
+    () => {},
+    () => {},
+    10,
+    undefined,
+    1024,
+    42,
+  ).find((t) => t.name === 'get_issue')!;
+  const result = String(await tool.invoke(new RunContext(), JSON.stringify({ number: 42 })));
+  expect(JSON.parse(result)).toMatchObject({ number: 42, status: 'ALREADY_PROVIDED' });
+  expect(get).not.toHaveBeenCalled();
+  expect(Buffer.byteLength(result)).toBeLessThan(300);
+  await tool.invoke(new RunContext(), JSON.stringify({ number: 43 }));
+  expect(get).toHaveBeenCalledWith(43);
+});
+it('retrieves the issue normally when no preflight issue was supplied', async () => {
+  const repo = fakeRepository();
+  const get = vi.spyOn(repo, 'getIssue');
+  const tool = createTools(
+    repo,
+    [],
+    () => {},
+    () => {},
+    10,
+  ).find((t) => t.name === 'get_issue')!;
+  await tool.invoke(new RunContext(), JSON.stringify({ number: 42 }));
+  expect(get).toHaveBeenCalledWith(42);
+});

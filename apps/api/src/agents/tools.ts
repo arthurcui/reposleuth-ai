@@ -21,6 +21,7 @@ export function createTools(
   maxTools: number,
   allowTool?: () => boolean,
   maxOutputBytes: number | (() => number) = 120000,
+  preflightIssueNumber?: number,
 ) {
   const outputByteLimit = () =>
     typeof maxOutputBytes === 'number' ? maxOutputBytes : maxOutputBytes();
@@ -93,7 +94,17 @@ export function createTools(
       description: 'Read the issue and bounded comments (live metadata).',
       parameters: z.object({ number: z.number().int().positive() }),
       errorFunction: null,
-      execute: ({ number }) => invoke('get_issue', () => repository.getIssue(number)),
+      execute: ({ number }) =>
+        invoke('get_issue', async () => {
+          if (number === preflightIssueNumber)
+            return {
+              number,
+              status: 'ALREADY_PROVIDED',
+              message:
+                'This issue is already supplied as preflightIssue in the investigation input. Use that data and read relevant source next.',
+            };
+          return repository.getIssue(number);
+        }),
     }),
     tool({
       name: 'list_files',

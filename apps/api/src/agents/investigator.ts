@@ -97,6 +97,7 @@ export async function investigate(options: {
       limits.tools,
       () => model.allowTool(),
       () => model.toolOutputBytes,
+      options.preflightIssue?.number,
     ),
     outputType: draftReportSchema,
   });

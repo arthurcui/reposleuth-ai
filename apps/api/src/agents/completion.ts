@@ -85,6 +85,25 @@ export class CompletionModel implements Model {
     if (input > 80000 || contextBytes < 1024) this.finish('CONTEXT_RESERVE');
     if (tokenBytes < 1024) this.finish('TOKEN_RESERVE');
     if (costBytes < 1024) this.finish('COST_RESERVE');
+    // Numeric planning evidence only: never retain prompts, source or provider errors.
+    this.emit('budget_plan', {
+      requestNumber: this.usage.requests + 1,
+      inputEstimate: input,
+      finalInputEstimate: finalInput,
+      requiredTokens,
+      requiredCostUsd: requiredCost,
+      toolOutputBytes: this.toolOutputBytes,
+      remainingTokens: this.limits.tokens - this.usage.inputTokens - this.usage.outputTokens,
+      remainingRunCostUsd:
+        this.limits.costUsd - this.usage.estimatedCostUsd - this.usage.reservedCostUsd,
+      constraints: {
+        lifetimeBytes: Number.isFinite(lifetimeBytes) ? Math.floor(lifetimeBytes) : null,
+        costBytes: Math.floor(costBytes),
+        tokenBytes: Math.floor(tokenBytes),
+        contextBytes: Math.floor(contextBytes),
+      },
+      reportingReason: this.reason ?? null,
+    });
     const response = await this.delegate.getResponse(
       this.reason ? this.finalRequest(request, this.reason) : request,
     );
