@@ -157,3 +157,49 @@ it.each([
     service.close();
   }
 });
+
+it('rejects malformed Gemini JSON despite a normal stop without retrying or repairing it', async () => {
+  const fetch = vi.fn(async () =>
+    Response.json({
+      id: 'malformed',
+      object: 'chat.completion',
+      created: 1,
+      model: GEMINI.model,
+      choices: [
+        {
+          index: 0,
+          message: { role: 'assistant', content: '{"summary":"private marker",}' },
+          finish_reason: 'stop',
+        },
+      ],
+      usage: { prompt_tokens: 1000, completion_tokens: 20, total_tokens: 1020 },
+    }),
+  );
+  vi.stubGlobal('fetch', fetch);
+  const service = new InvestigationService(
+    new InvestigationStore(':memory:'),
+    async () => fakeRepository(),
+    () => liveModel('test-key', GEMINI),
+    {},
+    1,
+    GEMINI,
+  );
+  try {
+    const run = await finish(service);
+    expect(run.status).toBe('failed');
+    expect(run.errorCode).toBe('INVALID_REPORT');
+    expect(run.report).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const failure = service.store
+      .events(run.id)
+      .find((event) => event.type === 'validation_failed');
+    expect(failure?.data).toMatchObject({
+      reason: 'INVALID_REPORT_JSON',
+      selectedJsonFailurePosition: expect.any(Number),
+      finishReasons: ['stop'],
+    });
+    expect(JSON.stringify(failure)).not.toContain('private marker');
+  } finally {
+    service.close();
+  }
+});

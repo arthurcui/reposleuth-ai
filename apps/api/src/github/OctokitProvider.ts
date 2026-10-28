@@ -2,6 +2,7 @@
 import { Octokit } from '@octokit/rest';
 
 import {
+  directoryScope,
   isSourcePath,
   LIMITS,
   parseRepository,
@@ -19,6 +20,7 @@ import {
   type RepositoryProvider,
   type RepositoryRevision,
   type SourceFile,
+  SourceRangeError,
 } from './RepositoryProvider.js';
 
 interface TreeFile {
@@ -33,6 +35,7 @@ export class OctokitProvider implements RepositoryProvider {
   readonly revision: Readonly<RepositoryRevision>;
   private requests = 0;
   private filesPromise?: Promise<{ files: TreeFile[]; warnings: string[] }>;
+  private indexedScope = '';
   private indexPromise?: Promise<{ index: Map<string, string[]>; warnings: string[] }>;
   private readonly cache = new Map<string, string[]>();
   private cacheBytes = 0;
@@ -146,18 +149,27 @@ export class OctokitProvider implements RepositoryProvider {
     return this.filesPromise;
   }
 
-  async listFiles(prefix = ''): Promise<BoundedResult<string>> {
+  async listFiles(prefix = '', offset = 0): Promise<BoundedResult<string>> {
     validatePath(prefix, true);
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > LIMITS.files)
+      throw new RepositoryError(
+        'INVALID_OFFSET',
+        'Use a non-negative listing offset within the tree limit.',
+      );
     const { files, warnings } = await this.files();
     const matching = files.filter((file) => file.path.startsWith(prefix));
     return {
       ...this.revision,
-      items: matching.slice(0, LIMITS.listedFiles).map((file) => file.path),
-      truncated: matching.length > LIMITS.listedFiles || warnings.length > 0,
+      items: matching.slice(offset, offset + LIMITS.listedFiles).map((file) => file.path),
+      nextOffset:
+        matching.length > offset + LIMITS.listedFiles ? offset + LIMITS.listedFiles : null,
+      truncated: matching.length > offset + LIMITS.listedFiles || warnings.length > 0,
       warnings: [
         ...warnings,
-        ...(matching.length > LIMITS.listedFiles
-          ? ['File listing capped at 500 paths. Narrow the prefix.']
+        ...(matching.length > offset + LIMITS.listedFiles
+          ? [
+              'File listing capped at 500 paths per page. Continue with nextOffset or narrow the prefix.',
+            ]
           : []),
       ],
     };
@@ -206,13 +218,11 @@ export class OctokitProvider implements RepositoryProvider {
       !Number.isSafeInteger(startLine) ||
       !Number.isSafeInteger(endLine) ||
       startLine < 1 ||
-      endLine < startLine ||
-      endLine - startLine >= LIMITS.readLines
+      endLine < 1
     )
-      throw new RepositoryError(
-        'INVALID_RANGE',
-        'Read 1–200 lines using positive integer line numbers.',
-      );
+      throw new SourceRangeError('INVALID_LINE_NUMBERS');
+    if (endLine < startLine) throw new SourceRangeError('REVERSED_RANGE');
+    if (endLine - startLine >= LIMITS.readLines) throw new SourceRangeError('TOO_MANY_LINES');
     const file = (await this.files()).files.find((file) => file.path === path);
     if (!file)
       throw new RepositoryError(
@@ -220,8 +230,7 @@ export class OctokitProvider implements RepositoryProvider {
         'Path is missing or excluded at the pinned revision.',
       );
     const lines = await this.source(file);
-    if (startLine > lines.length)
-      throw new RepositoryError('INVALID_RANGE', 'Start line is beyond the end of the file.');
+    if (startLine > lines.length) throw new SourceRangeError('START_AFTER_EOF', lines.length);
     const selected = lines.slice(startLine - 1, endLine);
     if (selected.join('\n').length > LIMITS.readCharacters)
       throw new RepositoryError(
@@ -238,13 +247,14 @@ export class OctokitProvider implements RepositoryProvider {
     };
   }
 
-  private async buildIndex() {
+  private async buildIndex(scope: string) {
     const { files, warnings: discoveryWarnings } = await this.files();
     const warnings = [...discoveryWarnings];
     const index = new Map<string, string[]>();
     let bytes = 0;
     let visited = 0;
     for (const file of files) {
+      if (scope && !file.path.startsWith(`${scope}/`)) continue;
       if (visited >= LIMITS.indexedFiles || bytes + file.size > LIMITS.indexBytes) {
         warnings.push(
           'Search index reached the 40-file / 2 MiB limit; remaining files were not searched.',
@@ -267,9 +277,14 @@ export class OctokitProvider implements RepositoryProvider {
     return { index, warnings };
   }
 
-  async searchCode(query: string): Promise<BoundedResult<CodeMatch>> {
+  async searchCode(query: string, requestedScope = ''): Promise<BoundedResult<CodeMatch>> {
     searchIndex(new Map(), query); // Validate before any network requests.
-    this.indexPromise ??= this.buildIndex();
+    const scope = directoryScope(requestedScope);
+    // Keep only the current scope index; source-cache and total request limits remain shared.
+    if (!this.indexPromise || this.indexedScope !== scope) {
+      this.indexedScope = scope;
+      this.indexPromise = this.buildIndex(scope);
+    }
     const { index, warnings } = await this.indexPromise;
     const result = searchIndex(index, query);
     return {

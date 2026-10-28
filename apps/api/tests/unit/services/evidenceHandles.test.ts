@@ -29,6 +29,7 @@ it('withholds oversized UTF-8 source without issuing a handle when the allowance
   const args = JSON.stringify({ path: file.path, startLine: 1, endLine: 1 });
   expect(JSON.parse(String(await read.invoke(new RunContext(), args)))).toMatchObject({
     error: 'OUTPUT_LIMIT',
+    suggestedRange: null,
   });
   expect(reads).toHaveLength(0);
   limit = 8000;
@@ -79,4 +80,50 @@ it('preserves whitespace and blank lines in a selected subrange', async () => {
   report.evidence[0]!.startLine = 2;
   report.evidence[0]!.endLine = 3;
   expect(materializeEvidence(report, repo.revision, [file]).evidence[0]?.quote).toBe('\n\tlast();');
+});
+
+it('suggests a fitting range and registers evidence only after the smaller retry', async () => {
+  const repo = fakeRepository();
+  const base = await repo.readFile('src/customers.ts', 1, 1);
+  repo.readFile = async (_path, start, end) => ({
+    ...base,
+    startLine: start,
+    endLine: end,
+    totalLines: 20,
+    lines: Array.from({ length: end - start + 1 }, (_, i) => ({
+      line: start + i,
+      text: '�'.repeat(100),
+    })),
+  });
+  const reads: SourceFile[] = [];
+  const read = createTools(
+    repo,
+    reads,
+    () => {},
+    () => {},
+    5,
+    undefined,
+    1024,
+  ).find((t) => t.name === 'read_file')!;
+  const blocked = JSON.parse(
+    String(
+      await read.invoke(
+        new RunContext(),
+        JSON.stringify({ path: base.path, startLine: 1, endLine: 20 }),
+      ),
+    ),
+  );
+  expect(blocked.error).toBe('OUTPUT_LIMIT');
+  expect(blocked.suggestedRange.startLine).toBe(1);
+  expect(blocked.suggestedRange.endLine).toBeLessThan(20);
+  expect(reads).toHaveLength(0);
+  const retry = String(
+    await read.invoke(
+      new RunContext(),
+      JSON.stringify({ path: base.path, ...blocked.suggestedRange }),
+    ),
+  );
+  expect(Buffer.byteLength(retry)).toBeLessThanOrEqual(1024);
+  expect(JSON.parse(retry).evidenceHandle).toBe('read-1');
+  expect(reads).toHaveLength(1);
 });

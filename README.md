@@ -19,6 +19,10 @@ These are separate from the prewritten demo and scripted replay corpus.
 
 ## How it works
 
+See the [model communication sequence and file-discovery walkthrough](docs/architecture.md#how-reposleuth-and-the-model-communicate)
+for who does what, how tool requests travel between the model and RepoSleuth, and
+how the model discovers which source lines to read and cite.
+
 ```mermaid
 flowchart TD
     Request["Repository URL + issue or investigation question"] --> API["API: pin repository revision and start investigation"]
@@ -462,7 +466,11 @@ usage is recorded after each response; an underestimated input stops further cal
 The issue fetched during preflight is included as untrusted input to avoid a redundant
 lookup. Search guidance favors reading a discovered path before another search.
 
-`find_files` searches filenames and paths case-insensitively within the bounded root
-listing, preserving truncation warnings. `list_files` accepts an empty prefix, `.` or
+`find_files` searches filenames and paths case-insensitively within a bounded
+directory listing, preserving truncation warnings. Both `find_files` and
+`search_code` accept a model-selected `scope`, such as `packages/solid-query`;
+empty or omitted scope searches from the root. File/byte limits apply after scope
+filtering, while total GitHub requests and source-cache limits stay shared.
+`list_files` accepts an empty prefix, `.` or
 `./` for the repository root. The agent is instructed to follow referenced class names
 to their implementation before reporting a cause.

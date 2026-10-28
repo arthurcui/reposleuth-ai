@@ -31,6 +31,18 @@ export function reportText(response: ModelResponse): string {
   );
 }
 
+/** Return only a numeric location from the runtime parser, never its potentially sensitive message. */
+export function jsonFailurePosition(text: string): number | null {
+  try {
+    JSON.parse(text);
+    return null;
+  } catch (error) {
+    const match =
+      error instanceof SyntaxError ? / at position (\d+)(?: |$)/.exec(error.message) : null;
+    return match ? Number(match[1]) : null;
+  }
+}
+
 export function reportDiagnostics(response: ModelResponse) {
   const metadata = z
     .object({
@@ -58,6 +70,7 @@ export function reportDiagnostics(response: ModelResponse) {
   return {
     messageCount: texts.length,
     messageCharacters: texts.map((text) => text.length),
+    selectedJsonFailurePosition: jsonFailurePosition(reportText(response)),
     messageJsonValid: texts.map((text) => {
       try {
         JSON.parse(text);

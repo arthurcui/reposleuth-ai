@@ -8,6 +8,7 @@ export interface BoundedResult<T> extends RepositoryRevision {
   items: T[];
   truncated: boolean;
   warnings: string[];
+  nextOffset?: number | null;
 }
 
 export interface SourceLine {
@@ -56,8 +57,8 @@ export interface FileDiff extends RepositoryRevision {
 export interface RepositoryProvider {
   readonly revision: Readonly<RepositoryRevision>;
   getIssue(number: number): Promise<IssueDetails>;
-  listFiles(prefix?: string): Promise<BoundedResult<string>>;
-  searchCode(query: string): Promise<BoundedResult<CodeMatch>>;
+  listFiles(prefix?: string, offset?: number): Promise<BoundedResult<string>>;
+  searchCode(query: string, scope?: string): Promise<BoundedResult<CodeMatch>>;
   readFile(path: string, startLine: number, endLine: number): Promise<SourceFile>;
   getCommits(path: string): Promise<BoundedResult<CommitSummary>>;
   getFileDiff(commitSha: string, path: string): Promise<FileDiff>;
@@ -70,5 +71,16 @@ export class RepositoryError extends Error {
   ) {
     super(message);
     this.name = 'RepositoryError';
+  }
+}
+
+/** Safe, structured range recovery data; never contains provider response text or source. */
+export class SourceRangeError extends RepositoryError {
+  constructor(
+    public readonly reason:
+      'INVALID_LINE_NUMBERS' | 'REVERSED_RANGE' | 'TOO_MANY_LINES' | 'START_AFTER_EOF',
+    public readonly totalLines?: number,
+  ) {
+    super('INVALID_RANGE', 'Choose a valid source line range.');
   }
 }

@@ -18,7 +18,7 @@ it.each(['.', './', ''])(
       10,
     ).find((t) => t.name === 'list_files')!;
     await tool.invoke(new RunContext(), JSON.stringify({ prefix }));
-    expect(list).toHaveBeenCalledWith('');
+    expect(list).toHaveBeenCalledWith('', 0);
   },
 );
 it('finds referenced names case-insensitively and preserves incomplete-list warnings', async () => {
@@ -65,4 +65,29 @@ it('caps matching paths and marks omitted matches', async () => {
   );
   expect(result.items).toHaveLength(40);
   expect(result.truncated).toBe(true);
+});
+
+it('passes model-selected scopes to discovery and search without guessing a package', async () => {
+  const repo = fakeRepository();
+  const list = vi.spyOn(repo, 'listFiles');
+  const search = vi.spyOn(repo, 'searchCode');
+  const tools = createTools(
+    repo,
+    [],
+    () => {},
+    () => {},
+    10,
+  );
+  await tools
+    .find((t) => t.name === 'find_files')!
+    .invoke(new RunContext(), JSON.stringify({ query: 'Service', scope: 'packages/api' }));
+  expect(list).toHaveBeenCalledWith('packages/api/');
+  await tools
+    .find((t) => t.name === 'search_code')!
+    .invoke(new RunContext(), JSON.stringify({ query: 'enabled', scope: 'packages/client' }));
+  expect(search).toHaveBeenCalledWith('enabled', 'packages/client');
+  await tools
+    .find((t) => t.name === 'search_code')!
+    .invoke(new RunContext(), JSON.stringify({ query: 'enabled' }));
+  expect(search).toHaveBeenLastCalledWith('enabled', '');
 });

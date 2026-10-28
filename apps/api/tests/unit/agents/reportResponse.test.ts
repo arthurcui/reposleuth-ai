@@ -2,7 +2,11 @@
 import { type ModelResponse, Usage } from '@openai/agents';
 import { expect, it } from 'vitest';
 
-import { reportDiagnostics, reportText } from '../../../src/agents/reportResponse.js';
+import {
+  jsonFailurePosition,
+  reportDiagnostics,
+  reportText,
+} from '../../../src/agents/reportResponse.js';
 const message = (text: string): ModelResponse['output'][number] => ({
   type: 'message',
   role: 'assistant',
@@ -47,4 +51,19 @@ it('records structural diagnostics and recognized termination reasons without ra
 it('handles empty responses without assuming they are valid JSON', () => {
   expect(reportText(response())).toBe('');
   expect(reportDiagnostics(response()).messageCount).toBe(0);
+});
+
+it.each(['{"secret":"private" "other":1}', '{"value":1,}', '{"value":"line\nfeed"}', '{}{}'])(
+  'records only a numeric syntax position for malformed output',
+  (text) => {
+    expect(() => JSON.parse(text)).toThrow();
+    expect(jsonFailurePosition(text)).toEqual(expect.any(Number));
+    const diagnostics = reportDiagnostics(response(message(text)));
+    expect(JSON.stringify(diagnostics)).not.toMatch(/secret|private|other|value|feed/);
+    expect(reportText(response(message(text)))).toBe(text);
+  },
+);
+it('does not invent a position for parser failures without one', () => {
+  expect(jsonFailurePosition('')).toBeNull();
+  expect(jsonFailurePosition('{}')).toBeNull();
 });
