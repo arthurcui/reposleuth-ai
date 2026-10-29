@@ -8,6 +8,7 @@ import {
   type Judgment,
   savedRunSchema,
 } from '../../../evaluation/benchmarks/grading.js';
+import { claimGroundingFixture } from '../../fixtures/claimGrounding.js';
 import { savedInvestigation } from '../../fixtures/savedInvestigation.js';
 
 const run = () => savedRunSchema.parse(savedInvestigation());
@@ -139,4 +140,39 @@ it('uses recorded read paths without mistaking citation count for files examined
   expect(result.examinedPaths).toHaveLength(2);
   expect(result.flags).not.toContain('MULTIPLE_PATHS_NOT_DEMONSTRATED_BY_CITATIONS');
   expect(result.flags).toContain('DEEP_COUNTER_EVIDENCE_MISSING');
+});
+
+it('keeps a correct cause with an exact but irrelevant citation unscored without a judge', async () => {
+  const f = claimGroundingFixture();
+  expect(await gradeAttempt(f.run, f.answer, () => f.source)).toMatchObject({
+    status: 'unscored',
+    citations: 'valid',
+    judgments: [],
+  });
+});
+it('does not pass incidental citations even when the private answer confirms the claimed cause', async () => {
+  const f = claimGroundingFixture();
+  const judge = vi.fn(async (input: string) => {
+    const parsed = JSON.parse(input);
+    expect(parsed.report.evidence[0].quote).toBe("import { db } from './db';");
+    expect(parsed.expected.evidence[0].startLine).toBe(2);
+    return f.judgment;
+  });
+  const result = await gradeAttempt(f.run, f.answer, () => f.source, judge);
+  expect(result).toMatchObject({ status: 'fail', citations: 'valid' });
+  expect(judge).toHaveBeenCalledOnce();
+  expect(result.judgments[0]).toMatchObject({ rootCause: 2, evidenceRelevance: 0, uncertainty: 0 });
+});
+it('does not blacklist import citations when a semantic judgment supports a narrow import claim', async () => {
+  const f = claimGroundingFixture();
+  f.run.report!.findings[0]!.explanation = 'This module imports db from ./db.';
+  const result = await gradeAttempt(
+    f.run,
+    f.answer,
+    () => f.source,
+    async () => ({ ...f.judgment, rootCause: 1, evidenceRelevance: 2, uncertainty: 2 }),
+  );
+  expect(result.citations).toBe('valid');
+  expect(result.judgments[0]!.evidenceRelevance).toBe(2);
+  expect(result.status).toBe('fail'); // Still not a complete diagnosis of the benchmark defect.
 });

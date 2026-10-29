@@ -1,4 +1,6 @@
 /** Reads public GitHub repositories and issues through Octokit at a pinned revision. */
+import { posix } from 'node:path';
+
 import { Octokit } from '@octokit/rest';
 
 import {
@@ -22,6 +24,7 @@ import {
   type SourceFile,
   SourceRangeError,
 } from './RepositoryProvider.js';
+import { sourceOutline } from './sourceNavigation.js';
 
 interface TreeFile {
   path: string;
@@ -236,6 +239,30 @@ export class OctokitProvider implements RepositoryProvider {
       this.cacheBytes += bytes.length;
     }
     return lines;
+  }
+
+  async outlineFile(path: string, query = '') {
+    validatePath(path);
+    if (query.length > 120)
+      throw new RepositoryError('INVALID_QUERY', 'Outline query is too long.');
+    const { files } = await this.files();
+    const file = files.find((file) => file.path === path);
+    if (!file) throw new RepositoryError('FILE_UNAVAILABLE', 'Path is missing or excluded.');
+    const result = sourceOutline(this.revision, path, (await this.source(file)).join('\n'), query);
+    for (const item of result.imports) {
+      if (!item.specifier.startsWith('.')) continue;
+      const base = posix.normalize(posix.join(posix.dirname(path), item.specifier));
+      if (base.startsWith('../') || base.startsWith('/')) continue;
+      const stem = base.replace(/\.[cm]?js$/, '');
+      const candidates = [
+        base,
+        ...['.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js'].map(
+          (ext) => stem + ext,
+        ),
+      ];
+      item.candidates = files.filter((f) => candidates.includes(f.path)).map((f) => f.path);
+    }
+    return result;
   }
 
   async readFile(path: string, startLine: number, endLine: number): Promise<SourceFile> {

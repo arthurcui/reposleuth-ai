@@ -22,7 +22,8 @@
     "benchmark": "npm run benchmark -w @reposleuth/api --",
     "format": "prettier --write \"apps/**/*.{ts,tsx,json,css,html}\" \"packages/**/*.{ts,json}\" \"scripts/*.mjs\" \"*.{js,ts,json}\"",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,json,css,html}\" \"packages/**/*.{ts,json}\" \"scripts/*.mjs\" \"*.{js,ts,json}\"",
-    "benchmark:grade": "npm run benchmark:grade -w @reposleuth/api --"
+    "benchmark:grade": "npm run benchmark:grade -w @reposleuth/api --",
+    "eval:compare": "tsx apps/api/evaluation/reliability/compare.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

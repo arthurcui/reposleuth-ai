@@ -10,7 +10,8 @@ import {
 } from '../github/RepositoryProvider.js';
 import { StopError } from './budget.js';
 import { listingPage } from './listingPage.js';
-import { readRecovery } from './readRecovery.js';
+import { sourceWindow } from './sourceWindow.js';
+import { type WorkingContext, workingPlanSchema } from './workingContext.js';
 
 export function createTools(
   repository: RepositoryProvider,
@@ -21,6 +22,7 @@ export function createTools(
   allowTool?: () => boolean,
   maxOutputBytes: number | (() => number) = 120000,
   preflightIssueNumber?: number,
+  working?: WorkingContext,
 ) {
   const outputByteLimit = () =>
     typeof maxOutputBytes === 'number' ? maxOutputBytes : maxOutputBytes();
@@ -38,28 +40,26 @@ export function createTools(
           'No further tools in this turn. Use existing results; if exploration has ended, report findings and uncertainties.',
       });
     if (++calls > maxTools) throw new StopError('BUDGET_EXCEEDED_TOOLS');
-    emit('tool_started', { name, call: calls, ...details });
+    emit('tool_started', { ...details, name, call: calls });
     try {
       const value = await action();
       check();
       const output = JSON.stringify(value);
       if (output.length > 30000 || Buffer.byteLength(output) > outputByteLimit()) {
         emit('tool_finished', { name, outcome: 'output_limit' });
-        return JSON.stringify({
+        const withheld = JSON.stringify({
           error: 'OUTPUT_LIMIT',
           message: 'Result too large. Narrow the request; content was not returned.',
         });
+        working?.record(name, withheld);
+        return withheld;
       }
+      const resultError = typeof value === 'object' && value !== null && 'error' in value;
       emit('tool_finished', {
         name,
-        outcome:
-          typeof value === 'object' &&
-          value !== null &&
-          'error' in value &&
-          value.error === 'OUTPUT_LIMIT'
-            ? 'output_limit'
-            : 'ok',
+        outcome: resultError ? (value.error === 'OUTPUT_LIMIT' ? 'output_limit' : 'error') : 'ok',
       });
+      working?.record(name, output);
       return output;
     } catch (error) {
       if (error instanceof StopError) throw error;
@@ -79,11 +79,54 @@ export function createTools(
         ...recovery,
         code: error instanceof RepositoryError ? error.code : 'TOOL_FAILED',
       });
-      return JSON.stringify({
+      const output = JSON.stringify({
         error: error instanceof RepositoryError ? error.code : 'TOOL_FAILED',
         ...recovery,
       });
+      working?.record(name, output);
+      return output;
     }
+  }
+  let readQueue: Promise<unknown> = Promise.resolve();
+  function readWindow(
+    path: string,
+    startLine: number,
+    endLine: number,
+    metadata: Record<string, unknown> = {},
+  ) {
+    const pending = readQueue.then(async () => {
+      const handle = `read-${reads.length + 1}`;
+      const window = await sourceWindow(
+        repository,
+        path,
+        startLine,
+        endLine,
+        handle,
+        outputByteLimit(),
+        check,
+        metadata,
+      );
+      if (!window)
+        return {
+          error: 'OUTPUT_LIMIT',
+          message:
+            'One whole source line cannot fit the quote/output allowance. Choose another range; no evidence was registered.',
+        };
+      reads.push(window.file);
+      emit('source_read', {
+        path: window.file.path,
+        commitSha: window.file.commitSha,
+        startLine: window.file.startLine,
+        endLine: window.file.endLine,
+        handle,
+      });
+      return window.value;
+    });
+    readQueue = pending.then(
+      () => undefined,
+      () => undefined,
+    );
+    return pending;
   }
   const scope = z.string().max(1024).nullable().optional();
   const path = z.string().min(1).max(1024);
@@ -147,7 +190,7 @@ export function createTools(
     tool({
       name: 'read_file',
       description:
-        'Read source and receive a run-scoped evidence handle. Cite that handle and a contained line range; at most 200 requested lines. End beyond EOF is clamped when start is valid; use returned startLine/endLine. Keep each cited excerpt under 4000 characters.',
+        'Read an exact source window and receive an evidence handle. Oversized requests are shortened automatically to at most 200 lines and 4000 quote characters, within budget. Cite returned startLine/endLine, never requested bounds. Continue from nextStartLine when non-null.',
       parameters: z.object({
         path,
         startLine: z.number().int().positive(),
@@ -158,30 +201,80 @@ export function createTools(
         invoke(
           'read_file',
           async () => {
-            const file = await repository.readFile(path, startLine, endLine);
-            const result = { ...file, evidenceHandle: `read-${reads.length + 1}` };
-            // Register only content actually returned to the model, including handle overhead.
-            if (
-              JSON.stringify(result).length <= 30000 &&
-              Buffer.byteLength(JSON.stringify(result)) <= outputByteLimit()
-            ) {
-              check();
-              reads.push(file);
-              emit('source_read', {
-                path: file.path,
-                commitSha: file.commitSha,
-                startLine: file.startLine,
-                endLine: file.endLine,
-                handle: result.evidenceHandle,
-              });
-            } else {
-              return readRecovery(file, result.evidenceHandle, outputByteLimit());
-            }
-            return result;
+            return readWindow(path, startLine, endLine);
           },
           { path, startLine, endLine },
         ),
     }),
+    tool({
+      name: 'outline_file',
+      description:
+        'Bounded declaration/import/call-site locations; not evidence. Optional query filters names before caps. Calls are syntax sites, not resolved references. TS/JS uses syntax parsing; C# is labeled lexical. Follow imports to implementations. Use read_definition or read_file for evidence.',
+      parameters: z.object({ path, query: z.string().max(120).nullable().optional() }),
+      errorFunction: null,
+      execute: ({ path, query }) =>
+        invoke('outline_file', () => repository.outlineFile(path, query ?? '')),
+    }),
+    tool({
+      name: 'read_definition',
+      description:
+        'Read a named TS/JS definition from an outline, beginning at its implementation. Specify startLine for overloads/duplicates. Returns bounded evidence and nextStartLine if shortened. C# lexical anchors require read_file.',
+      parameters: z.object({
+        path,
+        name: z.string().min(1).max(120),
+        startLine: z.number().int().positive().nullable().optional(),
+      }),
+      errorFunction: null,
+      execute: ({ path, name, startLine }) =>
+        invoke(
+          'read_definition',
+          async () => {
+            const outline = await repository.outlineFile(path, name);
+            if (outline.parser !== 'typescript')
+              return {
+                error: 'UNSUPPORTED_DEFINITION',
+                message: 'Use read_file around an outline anchor.',
+              };
+            const named = outline.definitions.filter((d) => d.name === name);
+            const selected =
+              startLine == null ? named : named.filter((d) => d.startLine === startLine);
+            const implementations = named.filter(
+              (d) =>
+                d.implementation &&
+                (startLine == null ||
+                  selected.some((s) => s.scopeStartOffset === d.scopeStartOffset)),
+            );
+            const matches = selected.some((d) => d.implementation)
+              ? selected.filter((d) => d.implementation)
+              : implementations;
+            if (matches.length !== 1)
+              return {
+                error: matches.length ? 'AMBIGUOUS_DEFINITION' : 'IMPLEMENTATION_NOT_FOUND',
+                candidates: matches.length ? matches : selected,
+                message:
+                  'Choose an implementation startLine or use outline/search. Declarations are not executable bodies.',
+              };
+            const definition = matches[0]!;
+            return readWindow(path, definition.startLine, definition.endLine, {
+              definitionEndLine: definition.endLine,
+              resolvedFromDeclaration: startLine != null && startLine !== definition.startLine,
+            });
+          },
+          { path, name },
+        ),
+    }),
+    ...(working
+      ? [
+          tool({
+            name: 'update_plan',
+            description:
+              'Record compact unverified hypotheses, source handles, missing evidence and next paths. Preserve gaps; do not record private chain-of-thought. Use after meaningful source progress, not every turn.',
+            parameters: workingPlanSchema,
+            errorFunction: null,
+            execute: (plan) => invoke('update_plan', async () => working.update(plan)),
+          }),
+        ]
+      : []),
     tool({
       name: 'get_commits',
       description: 'Recent file history anchored to the pinned commit.',

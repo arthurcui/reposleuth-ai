@@ -23,7 +23,7 @@ The app writes its own SQLite state and evaluation output, not the investigated 
 Repository connection verifies public visibility and pins the source commit. Issue
 metadata is live; the supplied issue number is checked before any model request.
 All retrieved text is untrusted. Citations must match exact lines actually returned
-by `read_file` in that run. Citation validity does not establish causal correctness.
+by `read_file` or `read_definition` in that run. Citation validity does not establish causal correctness.
 The frontend renders text with React escaping and constructs commit-pinned links.
 
 ## How RepoSleuth and the model communicate
@@ -31,7 +31,7 @@ The frontend renders text with React escaping and constructs commit-pinned links
 RepoSleuth owns the investigation loop. The external model proposes tool calls and
 interprets the returned code; it does not access GitHub directly. RepoSleuth sends
 instructions, the investigation question, the preflight issue when available, tool
-definitions, and accumulated context through the selected provider's API.
+definitions, and compact working context through the selected provider's API.
 
 ```mermaid
 sequenceDiagram
@@ -53,7 +53,7 @@ sequenceDiagram
         G-->>R: Repository data
         R->>R: Bound result size; register returned source evidence
         R->>R: Check remaining budget before next model request
-        R->>M: Tool result or bounded error, with accumulated context
+        R->>M: Compact task, working notes, evidence and recent tool results
     end
 
     opt Exploration allowance is nearly exhausted
@@ -170,3 +170,24 @@ Oversized source responses include a suggested smaller range computed against th
 Each model turn records a content-free `budget_plan`: current and final input estimates, combined planned token/cost allowance, per-constraint tool-output capacities, and the reporting reason. Unlimited lifetime headroom is represented as null. These are planning estimates, not billed costs; request admission and all hard limits remain unchanged. A repeated `get_issue` for the supplied preflight issue returns a short pointer to the original input instead of duplicating the issue/comments. Related issue numbers still use normal repository retrieval. The attempted tool call still consumes its normal allowance.
 
 Evidence materialization failures retain the existing `INVALID_LINE_RANGE` rejection code, with a safe diagnostic distinguishing reversed ranges, ranges outside the referenced read, missing lines, empty quotes, and quotes above the 4,000-character limit. Known handles supply a backend read index and requested/available numeric ranges; quote failures include character counts. Unknown handles do not imply an available range. Rejected text, IDs, handles, and source are not included in these diagnostics. Validation does not repair or accept the rejected report.
+
+### Citation fidelity versus claim support
+
+A completed report has passed structural and source-fidelity checks, not proof of diagnosis correctness. An exact import citation can support an import fact but cannot establish another function’s runtime behavior. Investigator instructions require issue-reported mechanisms to stay attributed and unverified until behavioral evidence supports them. The benchmark judge assesses each claim against its own cited lines rather than borrowing support from the private answer. The incidental-import offline fixture verifies that a correct cause plus a real but irrelevant quote stays unscored without a judge and fails when the supplied semantic judgment marks relevance as unsupported. These scripted judgments test grading behavior, not live-model reasoning; no deterministic import blacklist is introduced.
+
+
+## Integrated investigation context
+
+The SDK retains its conversation internally, but each provider request receives a self-contained untrusted-data snapshot before completion planning and hard admission. The snapshot includes the original task/issue, up to three model-authored hypotheses and six unresolved paths, a catalog of every successful source read, up to 18 KB of exact source (prioritizing pinned handles), and the last four tool outcomes. Older discovery payloads above 2,200 bytes are explicitly omitted; the latest result is retained within the tool output limit. Original source reads remain immutable for final citation validation even if absent from the current context. Re-reading may be required. Model notes are never promoted to facts or system instructions. No summary model or extra paid call is used.
+
+`outline_file` parses TS/JS/TSX declarations, imports, and call sites with the TypeScript parser. Query filtering happens before the 80-definition/80-call-site caps. Relative import candidates are restricted to actual eligible tree paths; aliases and external packages are not resolved. A call site is not a resolved reference. C# uses labeled lexical line anchors; other languages fall back to existing bounded search and reads. The parser never executes repository code.
+
+`read_definition` prefers executable TS/JS bodies over overload declarations in the same lexical scope. An explicitly selected overload redirects to its unique implementation; duplicate implementations still require disambiguation. Named function expressions, getters/setters and statically named function properties are included. This is syntax navigation, not semantic resolution.
+
+Both source-reading tools share bounded-window delivery: at most 200 lines, 4,000 quote characters and the current output allowance. Oversized requests return a fitting prefix and `nextStartLine`, rather than withholding the entire read. Provider output-limit recovery halves the range within the same tool call; other failures remain errors. Single lines that cannot fit produce no handle. Source calls serialize handle registration so concurrent calls cannot share an evidence handle. Existing request, cache, source-size, output and cost limits still apply.
+
+Draft citations may select a whole delivered window by supplying a handle and null line bounds, or select a narrower explicit range. The backend resolves the exact bounds and quote. Partial bounds, unknown handles, unseen lines, oversized quotes and dangling finding references remain invalid; no malformed report is silently repaired or accepted.
+
+Report verification metadata is built by the backend: source-citation fidelity, coverage, files/ranges examined, diagnosis unverified and runtime not executed. It is excluded from the model output schema. The UI and Markdown export show these distinctions; old reports remain readable without inventing verification details.
+
+The reliability additions in `evaluation/reliability` include four synthetic cases and an offline paired-results comparison. Run `npm run eval:compare -- path/to/observations.json`. The checker rejects missing pairs, duplicate attempts and mismatched input/settings hashes. It does not assert the supplied semantic assessments are true or certify that all planned cases/repetitions were run. See [milestone and campaign gates](investigation-reliability.md).

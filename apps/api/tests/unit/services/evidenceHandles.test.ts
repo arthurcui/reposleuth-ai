@@ -11,6 +11,24 @@ import { fakeRepository, validReport } from '../../fixtures/agentFixtures.js';
 function draft() {
   return { ...validReport(), evidence: [{ id: 'e1', handle: 'read-1', startLine: 1, endLine: 1 }] };
 }
+it('accepts a handle-only exact window but rejects half-specified ranges', async () => {
+  const repo = fakeRepository();
+  const file = await repo.readFile('src/customers.ts', 1, 1);
+  const whole = {
+    ...validReport(),
+    evidence: [{ id: 'e1', handle: 'read-1', startLine: null, endLine: null }],
+  };
+  expect(materializeEvidence(whole, repo.revision, [file]).evidence).toEqual(
+    validReport().evidence,
+  );
+  expect(() =>
+    materializeEvidence(
+      { ...whole, evidence: [{ id: 'e1', handle: 'read-1', startLine: 1, endLine: null }] },
+      repo.revision,
+      [file],
+    ),
+  ).toThrow();
+});
 it('withholds oversized UTF-8 source without issuing a handle when the allowance shrinks', async () => {
   const repo = fakeRepository();
   const file = await repo.readFile('src/customers.ts', 1, 1);
@@ -30,7 +48,6 @@ it('withholds oversized UTF-8 source without issuing a handle when the allowance
   const args = JSON.stringify({ path: file.path, startLine: 1, endLine: 1 });
   expect(JSON.parse(String(await read.invoke(new RunContext(), args)))).toMatchObject({
     error: 'OUTPUT_LIMIT',
-    suggestedRange: null,
   });
   expect(reads).toHaveLength(0);
   limit = 8000;
@@ -83,7 +100,7 @@ it('preserves whitespace and blank lines in a selected subrange', async () => {
   expect(materializeEvidence(report, repo.revision, [file]).evidence[0]?.quote).toBe('\n\tlast();');
 });
 
-it('suggests a fitting range and registers evidence only after the smaller retry', async () => {
+it('returns a fitting window immediately and exposes continuation', async () => {
   const repo = fakeRepository();
   const base = await repo.readFile('src/customers.ts', 1, 1);
   repo.readFile = async (_path, start, end) => ({
@@ -114,19 +131,13 @@ it('suggests a fitting range and registers evidence only after the smaller retry
       ),
     ),
   );
-  expect(blocked.error).toBe('OUTPUT_LIMIT');
-  expect(blocked.suggestedRange.startLine).toBe(1);
-  expect(blocked.suggestedRange.endLine).toBeLessThan(20);
-  expect(reads).toHaveLength(0);
-  const retry = String(
-    await read.invoke(
-      new RunContext(),
-      JSON.stringify({ path: base.path, ...blocked.suggestedRange }),
-    ),
-  );
-  expect(Buffer.byteLength(retry)).toBeLessThanOrEqual(1024);
-  expect(JSON.parse(retry).evidenceHandle).toBe('read-1');
+  expect(blocked.evidenceHandle).toBe('read-1');
+  expect(blocked.startLine).toBe(1);
+  expect(blocked.endLine).toBeLessThan(20);
+  expect(blocked.nextStartLine).toBe(blocked.endLine + 1);
+  expect(Buffer.byteLength(JSON.stringify(blocked))).toBeLessThanOrEqual(1024);
   expect(reads).toHaveLength(1);
+  expect(reads[0]!.endLine).toBe(blocked.endLine);
 });
 
 it.each([

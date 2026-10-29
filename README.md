@@ -476,3 +476,10 @@ filtering, while total GitHub requests and source-cache limits stay shared.
 `list_files` accepts an empty prefix, `.` or
 `./` for the repository root. The agent is instructed to follow referenced class names
 to their implementation before reporting a cause.
+
+
+### Investigation reliability
+
+The agent can outline TypeScript/JavaScript declarations, imports and call sites, then read a named definition with bounded continuation. C# navigation is explicitly lexical; other languages use source search. Compact working context retains the task, unverified hypotheses, unresolved paths and exact source evidence instead of resending the entire discovery conversation. Hard budget checks still apply to every actual request.
+
+Reports distinguish citation fidelity from diagnosis and runtime verification. A completed report is not a verified root cause. See the [integrated reliability milestone](docs/investigation-reliability.md) for local checks, limitations and the planned comparison gate. No live-quality improvement is claimed from scripted tests alone.

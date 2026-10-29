@@ -111,13 +111,13 @@ it.each([false, true])(
       expect(run.usage.estimatedCostUsd).toBeCloseTo(
         2000 * GEMINI.rates.input + 200 * GEMINI.rates.output,
       );
-      if (!reserveFinal)
-        expect(bodies[1]!.messages).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ role: 'tool', tool_call_id: 'read-1' }),
-          ]),
-        );
-      expect(JSON.stringify(bodies[1]!.messages)).toContain('test-signature');
+      // Each provider request is self-contained; SDK tool-call/signature history stays out of the compact context.
+      expect(JSON.stringify(bodies[1]!.messages)).toContain('sourceEvidence');
+      expect(JSON.stringify(bodies[1]!.messages)).toContain('read-1');
+      expect(JSON.stringify(bodies[1]!.messages)).not.toContain('test-signature');
+      expect(bodies[1]!.messages).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ role: 'tool' })]),
+      );
       expect(run.report?.evidence).toHaveLength(1);
     } finally {
       service.close();

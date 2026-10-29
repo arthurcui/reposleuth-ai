@@ -26,6 +26,13 @@ export function exportMarkdown(run: Investigation): string {
     `Status: ${text(run.status)}`,
     `Model: ${text(run.model)}`,
     `Mode: ${run.request.mode ?? 'standard'}`,
+    'Diagnosis: unverified; runtime tests not executed.',
+    ...(report.verification
+      ? [
+          `Coverage: ${report.verification.coverage}`,
+          `Source citations: ${report.verification.sourceCitations}; files examined: ${report.verification.filesExamined.length}; source ranges: ${report.verification.rangesExamined}`,
+        ]
+      : ['Verification details were not recorded for this saved report.']),
     ...(run.limits
       ? [
           `Limits: ${run.limits.timeoutMs / 60000} minutes · $${run.limits.costUsd.toFixed(2)} estimated cost`,

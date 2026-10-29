@@ -679,3 +679,62 @@ describe('metadata filename discovery', () => {
     },
   );
 });
+
+it('outlines pinned source and resolves only existing eligible local import candidates', async () => {
+  const source =
+    "import {load} from './service.js';\nimport external from 'package';\nexport function handler() { return load(); }";
+  const f = fixture((url) =>
+    url.pathname.endsWith(`/git/trees/${TREE_SHA}`)
+      ? {
+          data: {
+            truncated: false,
+            tree: ['src/api.ts', 'src/service.ts'].map((path) => ({
+              path,
+              type: 'blob',
+              mode: '100644',
+              sha: BLOB_SHA,
+              size: source.length,
+            })),
+          },
+        }
+      : url.pathname.endsWith(`/git/blobs/${BLOB_SHA}`)
+        ? {
+            data: {
+              encoding: 'base64',
+              size: Buffer.byteLength(source),
+              content: Buffer.from(source).toString('base64'),
+            },
+          }
+        : undefined,
+  );
+  const repo = await f.connect();
+  const outline = await repo.outlineFile('src/api.ts');
+  expect(outline.imports[0]?.candidates).toEqual(['src/service.ts']);
+  expect(outline.imports[1]?.candidates).toEqual([]);
+  expect(outline.definitions[0]?.name).toBe('handler');
+  await repo.outlineFile('src/api.ts', 'handler');
+  expect(f.calls.filter((url) => url.pathname.includes('/git/blobs/'))).toHaveLength(1);
+  await expect(repo.outlineFile('../secret')).rejects.toMatchObject({ code: 'INVALID_PATH' });
+});
+
+it('passes outline filters through the real provider before declaration caps', async () => {
+  const source = Array.from(
+    { length: 90 },
+    (_, i) => `export function name${i}() { return ${i}; }`,
+  ).join('\n');
+  const f = fixture((url) =>
+    url.pathname.endsWith(`/git/blobs/${BLOB_SHA}`)
+      ? {
+          data: {
+            size: Buffer.byteLength(source),
+            encoding: 'base64',
+            content: Buffer.from(source).toString('base64'),
+          },
+        }
+      : undefined,
+  );
+  const repo = await f.connect();
+  expect((await repo.outlineFile('src/customers.ts', 'name89')).definitions).toEqual([
+    expect.objectContaining({ name: 'name89', startLine: 90 }),
+  ]);
+});

@@ -22,6 +22,24 @@ export interface SourceFile extends RepositoryRevision {
   totalLines: number;
   lines: SourceLine[];
 }
+export interface SourceDefinition {
+  name: string;
+  kind: string;
+  startLine: number;
+  endLine: number;
+  implementation: boolean;
+  scopeStartOffset: number;
+}
+export interface SourceOutline extends RepositoryRevision {
+  path: string;
+  totalLines: number;
+  parser: 'typescript' | 'lexical' | 'unsupported';
+  definitions: SourceDefinition[];
+  calls: { name: string; line: number }[];
+  imports: { specifier: string; line: number; candidates: string[] }[];
+  truncated: boolean;
+  warnings: string[];
+}
 export interface CodeMatch {
   path: string;
   line: number;
@@ -60,6 +78,7 @@ export interface RepositoryProvider {
   listFiles(prefix?: string, offset?: number): Promise<BoundedResult<string>>;
   findFiles(query: string, scope?: string): Promise<BoundedResult<string>>;
   searchCode(query: string, scope?: string): Promise<BoundedResult<CodeMatch>>;
+  outlineFile(path: string, query?: string): Promise<SourceOutline>;
   readFile(path: string, startLine: number, endLine: number): Promise<SourceFile>;
   getCommits(path: string): Promise<BoundedResult<CommitSummary>>;
   getFileDiff(commitSha: string, path: string): Promise<FileDiff>;

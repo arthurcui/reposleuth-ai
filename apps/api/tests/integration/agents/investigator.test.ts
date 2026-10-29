@@ -215,9 +215,8 @@ describe('SDK investigation loop', () => {
         (request) => request.tracing === false && request.modelSettings.store === false,
       ),
     ).toBe(true);
-    expect(model.requests[3]?.input).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: 'function_call_result' })]),
-    );
+    expect(String(model.requests[3]?.input)).toContain('sourceEvidence');
+    expect(String(model.requests[3]?.input)).toContain('read-1');
   });
 
   it('rejects forged quotes, ranges, SHAs and evidence IDs', () => {
