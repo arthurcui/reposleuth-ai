@@ -3,6 +3,7 @@ import { type Model, type ModelRequest, type ModelResponse, Usage } from '@opena
 import type { InvestigationReport } from '@reposleuth/shared';
 
 import type { RepositoryProvider } from '../../src/github/RepositoryProvider.js';
+import { sourceOutline } from '../../src/github/sourceNavigation.js';
 
 export const SHA = 'a'.repeat(40);
 export function validReport(): InvestigationReport {
@@ -62,6 +63,16 @@ export function fakeRepository(): RepositoryProvider {
       truncated: false,
       warnings: [],
     }),
+    findFiles: async (query, scope = '') => ({
+      ...revision,
+      items:
+        (!scope || 'src/customers.ts'.startsWith(scope.replace(/\/$/, '') + '/')) &&
+        'src/customers.ts'.toLowerCase().includes(query.toLowerCase())
+          ? ['src/customers.ts']
+          : [],
+      truncated: false,
+      warnings: [],
+    }),
     searchCode: async () => ({
       ...revision,
       items: [
@@ -75,6 +86,7 @@ export function fakeRepository(): RepositoryProvider {
       truncated: false,
       warnings: [],
     }),
+    outlineFile: async (path) => sourceOutline(revision, path, 'await db.orders.findMany();'),
     readFile: async () => ({
       ...revision,
       path: 'src/customers.ts',

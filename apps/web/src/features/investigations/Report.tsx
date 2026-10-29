@@ -17,8 +17,26 @@ export function Report({ run }: { run: Investigation }) {
         <p className="eyebrow">ENGINEERING REPORT</p>
         <h2 id="report-title">What the evidence tells us</h2>
         <p>{report.summary}</p>
+        <div aria-label="Report verification">
+          <p>
+            <strong>
+              {report.verification?.coverage === 'insufficient_evidence'
+                ? 'Insufficient evidence'
+                : report.verification?.coverage === 'partial'
+                  ? 'Partial investigation'
+                  : 'Generated report'}
+            </strong>{' '}
+            � Diagnosis unverified � Runtime not tested
+          </p>
+          <p className="muted">
+            {report.verification
+              ? `${report.verification.filesExamined.length} files examined � ${report.verification.rangesExamined} source ranges � ${report.verification.sourceCitations === 'validated' ? 'Citations matched retrieved source' : 'No source citations'}`
+              : 'Verification details were not recorded for this saved report.'}
+          </p>
+        </div>
         <p className="muted">
-          Source references support the reasoning. Proposed fixes have not been applied or tested.
+          Citations identify retrieved source; they do not independently verify the diagnosis.
+          Proposed fixes have not been applied or tested.
         </p>
       </div>
       {report.reasoningSummary && (

@@ -53,3 +53,18 @@ it('exports cited reasoning and clearly marks unchecked alternatives', () => {
   expect(markdown).toContain('Unverified');
   expect(markdown).toContain('Limitations: No runtime profiling');
 });
+
+it('exports backend verification limits without upgrading generated reports to verified diagnoses', () => {
+  const run = savedInvestigation();
+  run.report!.verification = {
+    sourceCitations: 'validated',
+    diagnosis: 'unverified',
+    runtime: 'not_executed',
+    coverage: 'partial',
+    filesExamined: ['src/a.ts'],
+    rangesExamined: 2,
+  };
+  expect(exportMarkdown(run)).toContain('Diagnosis: unverified; runtime tests not executed.');
+  expect(exportMarkdown(run)).toContain('Coverage: partial');
+  expect(exportMarkdown(run)).toContain('files examined: 1');
+});

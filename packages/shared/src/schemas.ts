@@ -63,7 +63,16 @@ export const reasoningSummarySchema = z.object({
   evidenceIds: z.array(z.string()).max(20),
   limitations: text,
 });
+export const reportVerificationSchema = z.object({
+  sourceCitations: z.enum(['validated', 'none']),
+  diagnosis: z.literal('unverified'),
+  runtime: z.literal('not_executed'),
+  coverage: z.enum(['partial', 'generated', 'insufficient_evidence']),
+  filesExamined: z.array(z.string().max(1024)).max(48),
+  rangesExamined: z.number().int().nonnegative(),
+});
 export const reportSchema = z.object({
+  verification: reportVerificationSchema.optional(),
   reasoningSummary: reasoningSummarySchema.optional(),
   summary: text,
   findings: z

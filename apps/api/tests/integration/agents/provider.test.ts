@@ -111,13 +111,13 @@ it.each([false, true])(
       expect(run.usage.estimatedCostUsd).toBeCloseTo(
         2000 * GEMINI.rates.input + 200 * GEMINI.rates.output,
       );
-      if (!reserveFinal)
-        expect(bodies[1]!.messages).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({ role: 'tool', tool_call_id: 'read-1' }),
-          ]),
-        );
-      expect(JSON.stringify(bodies[1]!.messages)).toContain('test-signature');
+      // Each provider request is self-contained; SDK tool-call/signature history stays out of the compact context.
+      expect(JSON.stringify(bodies[1]!.messages)).toContain('sourceEvidence');
+      expect(JSON.stringify(bodies[1]!.messages)).toContain('read-1');
+      expect(JSON.stringify(bodies[1]!.messages)).not.toContain('test-signature');
+      expect(bodies[1]!.messages).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ role: 'tool' })]),
+      );
       expect(run.report?.evidence).toHaveLength(1);
     } finally {
       service.close();
@@ -153,6 +153,52 @@ it.each([
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(run.usage.usageIncomplete).toBe(true);
     expect(run.usage.reservedCostUsd).toBeGreaterThan(0);
+  } finally {
+    service.close();
+  }
+});
+
+it('rejects malformed Gemini JSON despite a normal stop without retrying or repairing it', async () => {
+  const fetch = vi.fn(async () =>
+    Response.json({
+      id: 'malformed',
+      object: 'chat.completion',
+      created: 1,
+      model: GEMINI.model,
+      choices: [
+        {
+          index: 0,
+          message: { role: 'assistant', content: '{"summary":"private marker",}' },
+          finish_reason: 'stop',
+        },
+      ],
+      usage: { prompt_tokens: 1000, completion_tokens: 20, total_tokens: 1020 },
+    }),
+  );
+  vi.stubGlobal('fetch', fetch);
+  const service = new InvestigationService(
+    new InvestigationStore(':memory:'),
+    async () => fakeRepository(),
+    () => liveModel('test-key', GEMINI),
+    {},
+    1,
+    GEMINI,
+  );
+  try {
+    const run = await finish(service);
+    expect(run.status).toBe('failed');
+    expect(run.errorCode).toBe('INVALID_REPORT');
+    expect(run.report).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const failure = service.store
+      .events(run.id)
+      .find((event) => event.type === 'validation_failed');
+    expect(failure?.data).toMatchObject({
+      reason: 'INVALID_REPORT_JSON',
+      selectedJsonFailurePosition: expect.any(Number),
+      finishReasons: ['stop'],
+    });
+    expect(JSON.stringify(failure)).not.toContain('private marker');
   } finally {
     service.close();
   }

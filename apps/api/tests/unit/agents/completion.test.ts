@@ -92,6 +92,16 @@ it.each([
   expect(model.reason).toBe(reason);
   expect(getResponse.mock.calls).toHaveLength(1);
   expect(emit).toHaveBeenCalledWith('reporting', { reason });
+  expect(emit).toHaveBeenCalledWith(
+    'budget_plan',
+    expect.objectContaining({
+      requestNumber: usage.requests,
+      reportingReason: reason,
+      requiredTokens: expect.any(Number),
+      requiredCostUsd: expect.any(Number),
+      constraints: expect.objectContaining({ lifetimeBytes: null }),
+    }),
+  );
   expect(model.allowTool()).toBe(false);
   expect(usage.reservedCostUsd).toBe(0);
 });

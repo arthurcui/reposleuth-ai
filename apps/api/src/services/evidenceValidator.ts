@@ -12,10 +12,19 @@ export type EvidenceFailure =
   | 'SOURCE_NOT_READ'
   | 'QUOTE_MISMATCH'
   | 'UNKNOWN_EVIDENCE_ID';
+/** Backend-built numeric range metadata; never includes model-supplied identifiers or prose. */
+export interface EvidenceRangeDiagnostic {
+  problem: 'REVERSED_RANGE' | 'OUTSIDE_READ' | 'MISSING_LINES' | 'EMPTY_QUOTE' | 'QUOTE_TOO_LONG';
+  readIndex: number;
+  requested: { startLine: number; endLine: number };
+  available: { startLine: number; endLine: number };
+  quoteCharacters?: number;
+}
 export class EvidenceValidationError extends StopError {
   constructor(
     public readonly reason: EvidenceFailure,
     public readonly evidenceIndex?: number,
+    public readonly rangeDiagnostic?: EvidenceRangeDiagnostic,
   ) {
     super('INVALID_EVIDENCE');
   }

@@ -114,3 +114,10 @@ export function searchIndex(index: ReadonlyMap<string, string[]>, query: string)
   }
   return { matches, truncated: false };
 }
+
+/** A scope is a repository-relative directory, never a loose sibling-matching prefix. */
+export function directoryScope(scope = ''): string {
+  if (scope === '.' || scope === './') return '';
+  validatePath(scope, true);
+  return scope.replace(/\/$/, '');
+}

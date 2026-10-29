@@ -5,6 +5,7 @@ import { type Model, type ModelResponse, Usage } from '@openai/agents';
 import type { InvestigationReport } from '@reposleuth/shared';
 
 import { RepositoryError, type RepositoryProvider } from '../../src/github/RepositoryProvider.js';
+import { sourceOutline } from '../../src/github/sourceNavigation.js';
 import type { EvalCase } from './cases.js';
 
 export function fixtureRepository(test: EvalCase): RepositoryProvider {
@@ -35,6 +36,16 @@ export function fixtureRepository(test: EvalCase): RepositoryProvider {
       truncated: false,
       warnings: [],
     }),
+    findFiles: async (query, scope = '') => ({
+      ...revision,
+      items:
+        (!scope || test.path.startsWith(scope.replace(/\/$/, '') + '/')) &&
+        test.path.toLowerCase().includes(query.toLowerCase())
+          ? [test.path]
+          : [],
+      truncated: false,
+      warnings: [],
+    }),
     searchCode: async (query) => ({
       ...revision,
       items: lines.flatMap((text, index) =>
@@ -45,6 +56,7 @@ export function fixtureRepository(test: EvalCase): RepositoryProvider {
       truncated: false,
       warnings: [],
     }),
+    outlineFile: async (path) => sourceOutline(revision, path, test.source),
     readFile: async (path, startLine, endLine) => {
       if (path !== test.path) throw new RepositoryError('NOT_FOUND', 'Fixture file absent');
       if (startLine < 1 || endLine < startLine || startLine > lines.length)

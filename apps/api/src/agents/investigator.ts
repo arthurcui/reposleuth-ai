@@ -13,6 +13,7 @@ import { investigationModelSettings } from './models/settings.js';
 import { type ProviderConfig } from './provider.js';
 import { reportDiagnostics, reportText } from './reportResponse.js';
 import { createTools } from './tools.js';
+import { WorkingContext, WorkingContextModel } from './workingContext.js';
 
 export async function investigate(options: {
   provider?: ProviderConfig;
@@ -35,6 +36,10 @@ export async function investigate(options: {
   };
   check();
   const reads: SourceFile[] = [];
+  const working = new WorkingContext(
+    { ...request, pinnedRevision: repository.revision, preflightIssue: options.preflightIssue },
+    reads,
+  );
   const budgetModel = new BudgetModel(
     options.model,
     limits,
@@ -84,7 +89,7 @@ export async function investigate(options: {
   const agent = new Agent({
     name: 'Engineering Investigator',
     instructions: `${instructions}\n${modeInstructions[request.mode ?? 'standard']}\n${summaryInstructions}`,
-    model,
+    model: new WorkingContextModel(model, working, emit),
     modelSettings: investigationModelSettings(
       options.provider?.provider ?? 'openai',
       limits.outputTokens,
@@ -97,6 +102,8 @@ export async function investigate(options: {
       limits.tools,
       () => model.allowTool(),
       () => model.toolOutputBytes,
+      options.preflightIssue?.number,
+      working,
     ),
     outputType: draftReportSchema,
   });
@@ -137,6 +144,19 @@ export async function investigate(options: {
   emit('validating', {});
   try {
     const report = materializeEvidence(result.finalOutput, repository.revision, reads);
+    report.verification = {
+      sourceCitations: report.evidence.length ? 'validated' : 'none',
+      diagnosis: 'unverified',
+      runtime: 'not_executed',
+      coverage: !report.evidence.length
+        ? 'insufficient_evidence'
+        : model.reason
+          ? 'partial'
+          : 'generated',
+      filesExamined: [...new Set(reads.map((file) => file.path))].slice(0, 48),
+      rangesExamined: reads.length,
+    };
+    emit('coverage', { ...report.verification });
     if (model.reason) {
       report.unresolvedQuestions = [
         `Partial investigation: exploration stopped to reserve the final report (${model.reason.toLowerCase().replaceAll('_', ' ')}). Remaining paths and alternatives may be unchecked.`,
@@ -149,6 +169,7 @@ export async function investigate(options: {
       emit('validation_failed', {
         reason: error.reason,
         evidenceIndex: error.evidenceIndex ?? null,
+        ...(error.rangeDiagnostic ? { range: error.rangeDiagnostic } : {}),
       });
     throw error;
   }

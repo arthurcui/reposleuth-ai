@@ -55,7 +55,7 @@ export const judgmentSchema = z.object({
 export type Judgment = z.infer<typeof judgmentSchema>;
 export type Judge = (input: string) => Promise<Judgment>;
 export type SourceReader = (repository: string, commit: string, path: string) => string;
-export const GRADER_VERSION = 'benchmark-grader-v1';
+export const GRADER_VERSION = 'benchmark-grader-v2';
 
 export async function gradeAttempt(
   run: SavedRun,

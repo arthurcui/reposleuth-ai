@@ -171,7 +171,18 @@ describe('SDK investigation loop', () => {
         },
       }),
     ).rejects.toMatchObject({ code: 'INVALID_EVIDENCE', reason: 'INVALID_LINE_RANGE' });
-    expect(diagnostics).toEqual([{ reason: 'INVALID_LINE_RANGE', evidenceIndex: 1 }]);
+    expect(diagnostics).toEqual([
+      {
+        reason: 'INVALID_LINE_RANGE',
+        evidenceIndex: 1,
+        range: {
+          problem: 'OUTSIDE_READ',
+          readIndex: 1,
+          requested: { startLine: 1, endLine: 2 },
+          available: { startLine: 1, endLine: 1 },
+        },
+      },
+    ]);
     expect(JSON.stringify(diagnostics)).not.toContain('untrusted rejected text');
     expect(model.requests).toHaveLength(4);
   });
@@ -204,9 +215,8 @@ describe('SDK investigation loop', () => {
         (request) => request.tracing === false && request.modelSettings.store === false,
       ),
     ).toBe(true);
-    expect(model.requests[3]?.input).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: 'function_call_result' })]),
-    );
+    expect(String(model.requests[3]?.input)).toContain('sourceEvidence');
+    expect(String(model.requests[3]?.input)).toContain('read-1');
   });
 
   it('rejects forged quotes, ranges, SHAs and evidence IDs', () => {

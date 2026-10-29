@@ -464,3 +464,277 @@ describe('read-only provider', () => {
     });
   });
 });
+
+describe('directory-scoped search', () => {
+  it('reaches a package beyond root listing/search windows without including sibling prefixes', async () => {
+    const paths = [
+      ...Array.from({ length: 600 }, (_, i) => `examples/file${String(i).padStart(3, '0')}.ts`),
+      'packages/target/index.ts',
+      'packages/target-extra/index.ts',
+    ];
+    const f = fixture((url) =>
+      url.pathname.includes('/git/trees/')
+        ? {
+            data: {
+              truncated: false,
+              tree: paths.map((path) => ({
+                path,
+                type: 'blob',
+                mode: '100644',
+                sha: BLOB_SHA,
+                size: 100,
+              })),
+            },
+          }
+        : undefined,
+    );
+    const repo = await f.connect();
+    expect((await repo.listFiles()).items).not.toContain('packages/target/index.ts');
+    const rootResult = await repo.searchCode('orders');
+    expect(rootResult.truncated).toBe(true);
+    expect(rootResult.items.some((item) => item.path.startsWith('packages/target/'))).toBe(false);
+    const result = await repo.searchCode('orders', 'packages/target/');
+    expect(result.truncated).toBe(false);
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(new Set(result.items.map((item) => item.path))).toEqual(
+      new Set(['packages/target/index.ts']),
+    );
+    const count = f.calls.length;
+    await repo.searchCode('customer', 'packages/target');
+    expect(f.calls).toHaveLength(count);
+    const other = await repo.searchCode('orders', 'packages/target-extra');
+    expect(new Set(other.items.map((item) => item.path))).toEqual(
+      new Set(['packages/target-extra/index.ts']),
+    );
+    expect((await repo.searchCode('orders', 'packages/missing')).items).toEqual([]);
+  });
+  it.each(['../src', '/src', 'src/../other', 'src\\other', 'https://host/src'])(
+    'rejects unsafe scope %s before network access',
+    async (scope) => {
+      const f = fixture();
+      const repo = await f.connect();
+      const count = f.calls.length;
+      await expect(repo.searchCode('orders', scope)).rejects.toMatchObject({
+        code: 'INVALID_PATH',
+      });
+      expect(f.calls).toHaveLength(count);
+    },
+  );
+  it('keeps the per-scope 40-file limit and warnings', async () => {
+    const f = fixture((url) =>
+      url.pathname.includes('/git/trees/')
+        ? {
+            data: {
+              truncated: false,
+              tree: Array.from({ length: 45 }, (_, i) => ({
+                path: `packages/target/file${i}.ts`,
+                type: 'blob',
+                mode: '100644',
+                sha: BLOB_SHA,
+                size: 100,
+              })),
+            },
+          }
+        : undefined,
+    );
+    const repo = await f.connect();
+    const result = await repo.searchCode('missing', 'packages/target');
+    expect(result.truncated).toBe(true);
+    expect(result.warnings.join(' ')).toContain('40-file');
+    expect(f.calls.filter((url) => url.pathname.includes('/git/blobs/'))).toHaveLength(40);
+  });
+});
+
+describe('range recovery', () => {
+  it.each([
+    [0, 2, 'INVALID_LINE_NUMBERS'],
+    [5, 2, 'REVERSED_RANGE'],
+    [1, 201, 'TOO_MANY_LINES'],
+  ])('rejects %s..%s before fetching source', async (start, end, reason) => {
+    const f = fixture();
+    const repo = await f.connect();
+    const before = f.calls.length;
+    await expect(
+      repo.readFile('src/customers.ts', Number(start), Number(end)),
+    ).rejects.toMatchObject({ code: 'INVALID_RANGE', reason });
+    expect(f.calls).toHaveLength(before);
+  });
+  it('reports EOF and clamps valid short-file reads', async () => {
+    const repo = await fixture().connect();
+    const totalLines = splitSource(SOURCE).length;
+    await expect(repo.readFile('src/customers.ts', 30, 40)).rejects.toMatchObject({
+      reason: 'START_AFTER_EOF',
+      totalLines,
+    });
+    const result = await repo.readFile('src/customers.ts', 1, 200);
+    expect(result.endLine).toBe(totalLines);
+    expect(result.lines).toHaveLength(totalLines);
+  });
+  it('pages the bounded tree without another tree request', async () => {
+    const f = fixture((url) =>
+      url.pathname.endsWith(`/git/trees/${TREE_SHA}`)
+        ? {
+            data: {
+              truncated: false,
+              tree: Array.from({ length: 520 }, (_, i) => ({
+                path: `src/file${i}.ts`,
+                type: 'blob',
+                mode: '100644',
+                sha: BLOB_SHA,
+                size: 5,
+              })),
+            },
+          }
+        : undefined,
+    );
+    const repo = await f.connect();
+    const first = await repo.listFiles('src/');
+    const second = await repo.listFiles('src/', first.nextOffset!);
+    expect(first.items).toHaveLength(500);
+    expect(second.items).toHaveLength(20);
+    expect(second.nextOffset).toBeNull();
+    expect(new Set([...first.items, ...second.items]).size).toBe(520);
+    expect(f.calls.filter((url) => url.pathname.includes('/git/trees/'))).toHaveLength(1);
+    await expect(repo.listFiles('', -1)).rejects.toMatchObject({ code: 'INVALID_OFFSET' });
+  });
+});
+
+describe('metadata filename discovery', () => {
+  function treeFixture(paths: string[], truncated = false) {
+    return fixture((url) =>
+      url.pathname.endsWith(`/git/trees/${TREE_SHA}`)
+        ? {
+            data: {
+              truncated,
+              tree: paths.map((path) => ({
+                path,
+                type: 'blob',
+                mode: '100644',
+                sha: BLOB_SHA,
+                size: 5,
+              })),
+            },
+          }
+        : undefined,
+    );
+  }
+  it('finds later paths at root and in scope without downloading source blobs', async () => {
+    const target = 'packages/client/z/BookingService.ts';
+    const f = treeFixture([
+      ...Array.from({ length: 600 }, (_, i) => `packages/client/a/file${i}.ts`),
+      target,
+      'packages/client-extra/BookingService.ts',
+    ]);
+    const repo = await f.connect();
+    expect((await repo.listFiles('packages/client/')).items).not.toContain(target);
+    expect((await repo.findFiles('bookingservice')).items).toHaveLength(2);
+    expect((await repo.findFiles('BOOKINGSERVICE', 'packages/client')).items).toEqual([target]);
+    expect((await repo.findFiles('bookingservice', 'packages/client/')).items).toEqual([target]);
+    expect(f.calls.filter((url) => url.pathname.includes('/git/trees/'))).toHaveLength(1);
+    expect(f.calls.some((url) => url.pathname.includes('/git/blobs/'))).toBe(false);
+  });
+  it('caps matches after filtering and preserves incomplete-tree warnings even without matches', async () => {
+    const repo = await treeFixture(
+      Array.from({ length: 45 }, (_, i) => `src/Service${i}.ts`),
+      true,
+    ).connect();
+    const result = await repo.findFiles('service');
+    expect(result.items).toHaveLength(40);
+    expect(result.truncated).toBe(true);
+    expect(result.warnings.join(' ')).toMatch(/truncated.*capped/);
+    const empty = await repo.findFiles('absent');
+    expect(empty.items).toEqual([]);
+    expect(empty.truncated).toBe(true);
+  });
+  it('never searches beyond the existing 5000-file tree bound', async () => {
+    const repo = await treeFixture([
+      ...Array.from({ length: 5000 }, (_, i) => `src/file${i}.ts`),
+      'src/HiddenService.ts',
+    ]).connect();
+    const result = await repo.findFiles('HiddenService');
+    expect(result.items).toEqual([]);
+    expect(result.truncated).toBe(true);
+    expect(result.warnings.join(' ')).toContain('tree limits');
+  });
+  it.each(['../src', 'src/../other', '/src', 'src\\child'])(
+    'rejects unsafe scope %s before GitHub reads',
+    async (scope) => {
+      const f = treeFixture([]);
+      const repo = await f.connect();
+      const before = f.calls.length;
+      await expect(repo.findFiles('service', scope)).rejects.toMatchObject({
+        code: 'INVALID_PATH',
+      });
+      expect(f.calls).toHaveLength(before);
+    },
+  );
+  it.each(['x', 'x'.repeat(201), 'bad\nquery', 'bad\0query'])(
+    'rejects invalid filename query before GitHub reads',
+    async (query) => {
+      const f = treeFixture([]);
+      const repo = await f.connect();
+      const before = f.calls.length;
+      await expect(repo.findFiles(query)).rejects.toMatchObject({ code: 'INVALID_QUERY' });
+      expect(f.calls).toHaveLength(before);
+    },
+  );
+});
+
+it('outlines pinned source and resolves only existing eligible local import candidates', async () => {
+  const source =
+    "import {load} from './service.js';\nimport external from 'package';\nexport function handler() { return load(); }";
+  const f = fixture((url) =>
+    url.pathname.endsWith(`/git/trees/${TREE_SHA}`)
+      ? {
+          data: {
+            truncated: false,
+            tree: ['src/api.ts', 'src/service.ts'].map((path) => ({
+              path,
+              type: 'blob',
+              mode: '100644',
+              sha: BLOB_SHA,
+              size: source.length,
+            })),
+          },
+        }
+      : url.pathname.endsWith(`/git/blobs/${BLOB_SHA}`)
+        ? {
+            data: {
+              encoding: 'base64',
+              size: Buffer.byteLength(source),
+              content: Buffer.from(source).toString('base64'),
+            },
+          }
+        : undefined,
+  );
+  const repo = await f.connect();
+  const outline = await repo.outlineFile('src/api.ts');
+  expect(outline.imports[0]?.candidates).toEqual(['src/service.ts']);
+  expect(outline.imports[1]?.candidates).toEqual([]);
+  expect(outline.definitions[0]?.name).toBe('handler');
+  await repo.outlineFile('src/api.ts', 'handler');
+  expect(f.calls.filter((url) => url.pathname.includes('/git/blobs/'))).toHaveLength(1);
+  await expect(repo.outlineFile('../secret')).rejects.toMatchObject({ code: 'INVALID_PATH' });
+});
+
+it('passes outline filters through the real provider before declaration caps', async () => {
+  const source = Array.from(
+    { length: 90 },
+    (_, i) => `export function name${i}() { return ${i}; }`,
+  ).join('\n');
+  const f = fixture((url) =>
+    url.pathname.endsWith(`/git/blobs/${BLOB_SHA}`)
+      ? {
+          data: {
+            size: Buffer.byteLength(source),
+            encoding: 'base64',
+            content: Buffer.from(source).toString('base64'),
+          },
+        }
+      : undefined,
+  );
+  const repo = await f.connect();
+  expect((await repo.outlineFile('src/customers.ts', 'name89')).definitions).toEqual([
+    expect.objectContaining({ name: 'name89', startLine: 90 }),
+  ]);
+});

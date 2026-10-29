@@ -13,6 +13,14 @@ Score each dimension 0-2: rootCause (wrong/absent, partial, correct mechanism), 
 (unsupported, partial, direct causal support), fix (wrong, incomplete, addresses cause), uncertainty
 (unsupported certainty, partial caveats, clear facts/hypotheses/limitations).
 Exact quotations alone do not establish causal relevance. Judge semantics, not keyword overlap.
+Assess whether each finding's own cited lines support the claim, not whether another excerpt or expected
+answer supplies the missing mechanism. A correct cause repeated from an issue can still score 0 for
+evidenceRelevance if its citation is incidental. Imports, declarations and wrappers can support narrow
+structural claims but do not by themselves prove runtime mechanisms in another implementation.
+Do not blacklist imports: an import citation can directly support a claim about that import.
+Unsupported high-confidence facts should reduce uncertainty scores even if a generic caveat appears
+elsewhere. Consider claims in the summary and reasoning as well as findings. Explicitly distinguish
+source-supported behavior, issue-reported hypotheses and runtime behavior that has not been verified.
 Set uncertain=true if evidence cannot settle a judgment. Give a concise evidence-based rationale.
 For Deep, alternatives must be competing CAUSES, not proposed fixes; counter-evidence must assess
 source that could weaken the preferred cause or explicitly explain why a check was inconclusive.
