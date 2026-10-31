@@ -36,6 +36,34 @@ const read = event(2, 'source_read', {
   commitSha: run.commitSha,
 });
 
+it('distinguishes a corrected accepted report from its earlier rejected response', () => {
+  render(
+    <InvestigationDiagnostics
+      run={{ ...run, status: 'completed', errorCode: null, report: demo.report }}
+      events={[
+        event(3, 'validation_failed', { reason: 'INVALID_REPORT_JSON' }),
+        event(4, 'report_correction', { status: 'shape_valid' }),
+      ]}
+    />,
+  );
+  expect(screen.getByText(/The corrected report passed validation/)).toBeTruthy();
+  expect(screen.queryByText(/The model did not return valid report JSON/)).toBeNull();
+});
+
+it('still rejects invalid citations after a successful format correction', () => {
+  render(
+    <InvestigationDiagnostics
+      run={{ ...run, status: 'failed', errorCode: 'INVALID_EVIDENCE' }}
+      events={[
+        event(3, 'report_correction', { status: 'shape_valid' }),
+        event(4, 'validation_failed', { reason: 'UNKNOWN_HANDLE' }),
+      ]}
+    />,
+  );
+  expect(screen.getByText(/source handle that was not retrieved/)).toBeTruthy();
+  expect(screen.queryByText(/The corrected report passed validation/)).toBeNull();
+});
+
 it('shows the exact limit, last unfinished tool and deduplicated pinned source reads', () => {
   render(
     <InvestigationDiagnostics

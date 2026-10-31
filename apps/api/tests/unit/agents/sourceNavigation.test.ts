@@ -7,6 +7,74 @@ import type { SourceFile } from '../../../src/github/RepositoryProvider.js';
 import { sourceOutline } from '../../../src/github/sourceNavigation.js';
 import { fakeRepository } from '../../fixtures/agentFixtures.js';
 const revision = fakeRepository().revision;
+it('reads around a late call inside a large definition without fetching its prefix', async () => {
+  const repo = fakeRepository();
+  const lines = [
+    'export function render() {',
+    ...Array.from({ length: 230 }, () => '  // setup'),
+    '  return createResource(fetcher);',
+    '}',
+  ];
+  repo.outlineFile = async (path, query) => sourceOutline(revision, path, lines.join('\n'), query);
+  const requested: number[] = [];
+  repo.readFile = async (path, startLine, endLine) => {
+    requested.push(startLine);
+    return {
+      ...revision,
+      path,
+      startLine,
+      endLine,
+      totalLines: lines.length,
+      lines: lines.slice(startLine - 1, endLine).map((text, i) => ({ line: startLine + i, text })),
+    };
+  };
+  const reads: SourceFile[] = [];
+  const tool = createTools(
+    repo,
+    reads,
+    () => {},
+    () => {},
+    5,
+  ).find((t) => t.name === 'read_definition')!;
+  const value = JSON.parse(
+    String(
+      await tool.invoke(
+        new RunContext(),
+        JSON.stringify({ path: 'adapter.ts', name: 'render', focus: 'createResource' }),
+      ),
+    ),
+  );
+  expect(requested).toEqual([224]);
+  expect(value.startLine).toBe(224);
+  expect(value.definitionStartLine).toBe(1);
+  expect(value.definitionEndLine).toBe(233);
+  expect(reads[0]!.lines.some((l) => l.line === 232 && l.text.includes('createResource'))).toBe(
+    true,
+  );
+});
+it('does not choose arbitrarily between repeated focus call sites', async () => {
+  const repo = fakeRepository();
+  repo.outlineFile = async (path, query) =>
+    sourceOutline(revision, path, 'function run() { load(); load(); }', query);
+  const reads: SourceFile[] = [];
+  const tool = createTools(
+    repo,
+    reads,
+    () => {},
+    () => {},
+    5,
+  ).find((t) => t.name === 'read_definition')!;
+  const result = JSON.parse(
+    String(
+      await tool.invoke(
+        new RunContext(),
+        JSON.stringify({ path: 'file.ts', name: 'run', focus: 'load' }),
+      ),
+    ),
+  );
+  expect(result.error).toBe('AMBIGUOUS_FOCUS');
+  expect(reads).toHaveLength(0);
+});
 it('never redirects a declaration into a sibling scope starting on the same line', async () => {
   const repo = fakeRepository();
   repo.outlineFile = async (path, query) =>

@@ -22,6 +22,7 @@ export async function runCase(
     provider?: ProviderConfig;
     budgetUsd?: number;
     ledgerPath?: string;
+    workflow?: 'guided';
   } = {},
 ) {
   const repository = fixtureRepository(test);
@@ -33,6 +34,7 @@ export async function runCase(
     { costUsd: 0.02, timeoutMs: 60000 },
     options.budgetUsd ?? 1,
     options.provider,
+    options.workflow,
   );
   const started = performance.now();
   try {
@@ -70,6 +72,7 @@ export async function runCase(
     ];
     return {
       caseId: test.id,
+      workflow: options.workflow ?? 'existing',
       category: test.category,
       durationMs: Math.round(performance.now() - started),
       model: run.model,
@@ -96,6 +99,7 @@ export async function runCase(
 async function main() {
   const args = process.argv.slice(2);
   const live = args.includes('--live');
+  const workflow = args.includes('--guided') ? 'guided' : undefined;
   const caseIndex = args.indexOf('--case');
   const selected = caseIndex >= 0 ? cases.filter((test) => test.id === args[caseIndex + 1]) : cases;
   if (!selected.length) throw new Error('Unknown case. See apps/api/src/evals/cases.ts.');
@@ -126,6 +130,7 @@ async function main() {
         provider,
         budgetUsd,
         ledgerPath: live ? `${directory}live-budget.sqlite` : undefined,
+        workflow,
       });
       results.push(result);
       if (
@@ -155,6 +160,7 @@ async function main() {
   const summary = {
     runId,
     mode: live ? 'live-model' : 'scripted-replay',
+    workflow: workflow ?? 'existing',
     generatedAt: new Date().toISOString(),
     planned: selected.length,
     attempted: results.length,

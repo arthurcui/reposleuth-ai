@@ -153,6 +153,8 @@ export function useInvestigationWorkspace() {
       'validating',
       'reporting',
       'validation_failed',
+      'report_correction',
+      'coverage',
       'terminal',
     ])
       source.addEventListener(name, receive as EventListener);

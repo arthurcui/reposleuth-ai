@@ -51,6 +51,8 @@ it('keeps the Gemini summary contract instead of adding exploration instructions
     const body = JSON.parse(String(init.body));
     expect(JSON.stringify(body.messages)).not.toContain('exploration is complete');
     expect(body.tools ?? []).toEqual([]);
+    expect(JSON.stringify(body.messages)).toContain('minItems');
+    expect(JSON.stringify(body.messages)).toContain('required');
     return Response.json({
       id: 'test',
       object: 'chat.completion',
@@ -72,6 +74,41 @@ it('keeps the Gemini summary contract instead of adding exploration instructions
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(output.modelUsage?.usageIncomplete).toBe(false);
 });
+
+it.each([1, 0])(
+  'retains a substantive single-section overview but rejects empty sections (%s)',
+  async (count) => {
+    const value = { ...summary, sections: summary.sections.slice(0, count) };
+    const output = await summarizeBriefing(
+      report,
+      {
+        getResponse: async () => ({
+          usage: new Usage({ inputTokens: 100, outputTokens: 100 }),
+          output: [
+            {
+              type: 'message',
+              role: 'assistant',
+              status: 'completed',
+              content: [{ type: 'output_text', text: JSON.stringify(value) }],
+            },
+          ],
+        }),
+        getStreamedResponse: () => {
+          throw Error('unused');
+        },
+      },
+      GEMINI,
+      () => {},
+    );
+    if (count) {
+      expect(output.summary?.sections).toEqual(value.sections);
+      expect(output.summaryError).toBeUndefined();
+    } else {
+      expect(output.summary).toBeUndefined();
+      expect(output.summaryDiagnostics?.stage).toBe('overview-schema');
+    }
+  },
+);
 it('rejects invented sources while preserving source facts and billed usage', async () => {
   const output = await summarizeBriefing(
     report,

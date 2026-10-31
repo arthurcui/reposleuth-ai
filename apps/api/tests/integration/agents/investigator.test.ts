@@ -5,10 +5,140 @@ import { describe, expect, it } from 'vitest';
 
 import { BudgetModel, DEFAULT_LIMITS, emptyUsage } from '../../../src/agents/budget.js';
 import { investigate } from '../../../src/agents/investigator.js';
+import { reportText } from '../../../src/agents/reportResponse.js';
+import { sourceOutline } from '../../../src/github/sourceNavigation.js';
+import { draftReportSchema } from '../../../src/services/evidenceHandles.js';
 import { validateEvidence } from '../../../src/services/evidenceValidator.js';
 import { fakeRepository, ScriptedModel, validReport } from '../../fixtures/agentFixtures.js';
 
 describe('SDK investigation loop', () => {
+  it('reads a late call through the SDK and preserves unexamined definition ranges in the report', async () => {
+    const repository = fakeRepository();
+    const source = [
+      'function load() {',
+      ...Array.from({ length: 230 }, () => '  // setup'),
+      '  createResource();',
+      '}',
+    ];
+    repository.outlineFile = async (path, query) =>
+      sourceOutline(repository.revision, path, source.join('\n'), query);
+    repository.readFile = async (path, startLine, endLine) => ({
+      ...repository.revision,
+      path,
+      startLine,
+      endLine: Math.min(endLine, source.length),
+      totalLines: source.length,
+      lines: source.slice(startLine - 1, endLine).map((text, i) => ({ line: startLine + i, text })),
+    });
+    const requests: ModelRequest[] = [];
+    const model: Model = {
+      getResponse: async (request) => {
+        requests.push(request);
+        return {
+          usage: new Usage({ inputTokens: 200, outputTokens: 100 }),
+          output:
+            requests.length === 1
+              ? [
+                  {
+                    type: 'function_call',
+                    callId: 'focus',
+                    status: 'completed',
+                    name: 'read_definition',
+                    arguments: JSON.stringify({
+                      path: 'large.ts',
+                      name: 'load',
+                      focus: 'createResource',
+                    }),
+                  },
+                ]
+              : [
+                  {
+                    type: 'message',
+                    role: 'assistant',
+                    status: 'completed',
+                    content: [
+                      {
+                        type: 'output_text',
+                        text: JSON.stringify({
+                          ...validReport(),
+                          evidence: [
+                            { id: 'e1', handle: 'read-1', startLine: null, endLine: null },
+                          ],
+                        }),
+                      },
+                    ],
+                  },
+                ],
+        };
+      },
+      getStreamedResponse: () => {
+        throw Error('unused');
+      },
+    };
+    const report = await investigate({
+      repository,
+      request: { repository: 'owner/repo', question: 'Inspect the resource call' },
+      model,
+      limits: DEFAULT_LIMITS,
+      usage: emptyUsage(),
+      signal: new AbortController().signal,
+      reserve: () => {},
+      saveUsage: () => {},
+      emit: () => {},
+    });
+    expect(report.evidence[0]).toMatchObject({ path: 'large.ts', startLine: 224 });
+    expect(report.evidence[0]!.quote).toContain('createResource();');
+    expect(report.verification?.coverage).toBe('partial');
+    expect(report.unresolvedQuestions.join(' ')).toContain('large.ts:1-223');
+    expect(JSON.stringify(requests[1]!.input)).toContain('unreadSourceRanges');
+  });
+  it.each([false, true])(
+    'revalidates evidence after a shape correction (forged=%s)',
+    async (forged) => {
+      const scripted = new ScriptedModel();
+      const model: Model = {
+        getResponse: async (request) => {
+          const response = await scripted.getResponse(request);
+          if (scripted.requests.length >= 4) {
+            const draft = draftReportSchema.parse(JSON.parse(reportText(response)));
+            if (scripted.requests.length === 4) draft.findings[0]!.evidenceIds = [];
+            else if (forged) draft.evidence[0]!.handle = 'read-999';
+            response.output = [
+              {
+                type: 'message',
+                role: 'assistant',
+                status: 'completed',
+                content: [{ type: 'output_text', text: JSON.stringify(draft) }],
+              },
+            ];
+          }
+          return response;
+        },
+        getStreamedResponse: () => {
+          throw Error('unused');
+        },
+      };
+      const usage = emptyUsage();
+      const result = investigate({
+        repository: fakeRepository(),
+        request: { repository: 'owner/repo', question: 'Why slow?' },
+        model,
+        limits: DEFAULT_LIMITS,
+        usage,
+        signal: new AbortController().signal,
+        reserve: () => {},
+        saveUsage: () => {},
+        emit: () => {},
+      });
+      if (forged) await expect(result).rejects.toMatchObject({ reason: 'UNKNOWN_HANDLE' });
+      else
+        await expect(result).resolves.toMatchObject({
+          evidence: [expect.objectContaining({ quote: 'await db.orders.findMany();' })],
+        });
+      expect(usage.requests).toBe(5);
+      expect(scripted.requests[4]!.tools).toEqual([]);
+    },
+  );
   it('validates the final report instead of concatenating earlier assistant commentary', async () => {
     const scripted = new ScriptedModel();
     const delegate: Model = {

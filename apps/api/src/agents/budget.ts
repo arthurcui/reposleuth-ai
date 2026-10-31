@@ -2,6 +2,7 @@
 import type { Model, ModelRequest, ModelResponse } from '@openai/agents';
 import type { InvestigationUsage } from '@reposleuth/shared';
 
+import { modelFailure } from './modelFailure.js';
 import { estimateInputTokens } from './tokens.js';
 
 export const MODEL = 'gpt-6-luna';
@@ -55,6 +56,7 @@ export class BudgetModel implements Model {
     private readonly provider: 'openai' | 'gemini' = 'openai',
     private readonly modelName?: string,
     private readonly measured?: (estimated: number, actual: number) => void,
+    private readonly failed?: (details: ReturnType<typeof modelFailure>) => void,
   ) {}
 
   async getResponse(request: ModelRequest): Promise<ModelResponse> {
@@ -90,6 +92,7 @@ export class BudgetModel implements Model {
         },
       });
     } catch (error) {
+      this.failed?.(modelFailure(error));
       this.check();
       const status =
         typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;

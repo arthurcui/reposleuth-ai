@@ -23,9 +23,11 @@ export function liveModel(apiKey: string, config: ProviderConfig = OPENAI): Mode
         // Gemini compatibility uses JSON-object mode, including final reporting.
         // Pass the schema itself (not the SDK envelope) and validate strictly locally.
         systemInstructions:
-          request.outputType === 'text' && request.tools.length === 0
-            ? request.systemInstructions
-            : `${request.systemInstructions ?? ''}\nWhen finished, return only JSON matching this schema. Return an instance with actual findings, never the schema itself. No markdown fences or surrounding commentary:\n${JSON.stringify(typeof request.outputType === 'object' ? request.outputType.schema : request.outputType)}`,
+          request.outputType === 'text'
+            ? request.tools.length === 0
+              ? request.systemInstructions
+              : `${request.systemInstructions ?? ''}\nUse tools during exploration. If ending without a tool call, return a JSON object indicating exploration is complete. Do not invent report fields; reporting is a separate phase.`
+            : `${request.systemInstructions ?? ''}\nWhen finished, return only JSON matching this schema. Return an instance with actual findings, never the schema itself. No markdown fences or surrounding commentary:\n${JSON.stringify(request.outputType.schema)}`,
         outputType: 'text',
         modelSettings: {
           ...request.modelSettings,

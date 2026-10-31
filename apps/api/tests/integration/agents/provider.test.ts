@@ -158,7 +158,7 @@ it.each([
   }
 });
 
-it('rejects malformed Gemini JSON despite a normal stop without retrying or repairing it', async () => {
+it('rejects malformed Gemini JSON after one bounded correction despite a normal stop', async () => {
   const fetch = vi.fn(async () =>
     Response.json({
       id: 'malformed',
@@ -189,7 +189,8 @@ it('rejects malformed Gemini JSON despite a normal stop without retrying or repa
     expect(run.status).toBe('failed');
     expect(run.errorCode).toBe('INVALID_REPORT');
     expect(run.report).toBeNull();
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(run.usage.requests).toBe(2);
     const failure = service.store
       .events(run.id)
       .find((event) => event.type === 'validation_failed');

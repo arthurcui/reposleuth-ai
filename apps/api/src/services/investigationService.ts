@@ -29,6 +29,7 @@ export class InvestigationService {
     limits: Partial<RunLimits> = {},
     private readonly lifetimeBudgetUsd = 1,
     private readonly provider: ProviderConfig = OPENAI,
+    private readonly workflow?: 'guided',
   ) {
     this.limits = limits;
     for (const record of store.active()) {
@@ -153,6 +154,7 @@ export class InvestigationService {
           if (controller.signal.aborted || this.closed) throw new StopError('CANCELLED');
         }
         return investigate({
+          workflow: this.workflow,
           provider: selected,
           preflightIssue,
           repository,

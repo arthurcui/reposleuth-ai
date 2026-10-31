@@ -8,14 +8,17 @@ import { draftReportSchema, materializeEvidence } from '../services/evidenceHand
 import { EvidenceValidationError } from '../services/evidenceValidator.js';
 import { BudgetModel, type RunLimits, StopError } from './budget.js';
 import { CompletionModel } from './completion.js';
+import { investigateGuided } from './guided.js';
 import { instructions, modeInstructions, summaryInstructions } from './instructions.js';
 import { investigationModelSettings } from './models/settings.js';
 import { type ProviderConfig } from './provider.js';
-import { reportDiagnostics, reportText } from './reportResponse.js';
+import { validateReportShape } from './reportValidation.js';
 import { createTools } from './tools.js';
 import { WorkingContext, WorkingContextModel } from './workingContext.js';
 
-export async function investigate(options: {
+export type InvestigationOptions = {
+  /** Explicit experiment opt-in; existing application behavior remains the baseline. */
+  workflow?: 'guided';
   provider?: ProviderConfig;
   preflightIssue?: IssueDetails;
   repository: RepositoryProvider;
@@ -29,7 +32,10 @@ export async function investigate(options: {
   remainingBudget?: () => number;
   deadline?: number;
   emit: (type: string, data: Record<string, unknown>) => void;
-}) {
+};
+
+export async function investigate(options: InvestigationOptions) {
+  if (options.workflow === 'guided') return investigateGuided(options);
   const { repository, request, limits, signal, emit } = options;
   const check = () => {
     if (signal.aborted) throw new StopError(signal.reason === 'TIMEOUT' ? 'TIMEOUT' : 'CANCELLED');
@@ -51,6 +57,7 @@ export async function investigate(options: {
     options.provider?.provider,
     options.provider?.model,
     (estimated, actual) => emit('token_estimate', { estimated, actual }),
+    (details) => emit('model_request_failed', details),
   );
   const model = new CompletionModel(
     budgetModel,
@@ -60,30 +67,7 @@ export async function investigate(options: {
     options.provider?.rates,
     options.remainingBudget,
     options.deadline,
-    (response) => {
-      const text = reportText(response);
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        emit('validation_failed', {
-          reason: 'INVALID_REPORT_JSON',
-          characters: text.length,
-          fenced: text.trimStart().startsWith('```'),
-          endsObject: text.trimEnd().endsWith('}'),
-          ...reportDiagnostics(response),
-        });
-        throw new StopError('INVALID_REPORT');
-      }
-      const validated = draftReportSchema.safeParse(parsed);
-      if (!validated.success) {
-        emit('validation_failed', {
-          reason: 'INVALID_REPORT_SCHEMA',
-          fields: validated.error.issues.map((issue) => ({ code: issue.code, path: issue.path })),
-        });
-        throw new StopError('INVALID_REPORT');
-      }
-    },
+    (response) => validateReportShape(response, emit),
     options.provider?.model,
   );
   const agent = new Agent({
@@ -144,13 +128,14 @@ export async function investigate(options: {
   emit('validating', {});
   try {
     const report = materializeEvidence(result.finalOutput, repository.revision, reads);
+    const pending = working.pendingRanges();
     report.verification = {
       sourceCitations: report.evidence.length ? 'validated' : 'none',
       diagnosis: 'unverified',
       runtime: 'not_executed',
       coverage: !report.evidence.length
         ? 'insufficient_evidence'
-        : model.reason
+        : model.reason || pending.length
           ? 'partial'
           : 'generated',
       filesExamined: [...new Set(reads.map((file) => file.path))].slice(0, 48),
@@ -160,6 +145,16 @@ export async function investigate(options: {
     if (model.reason) {
       report.unresolvedQuestions = [
         `Partial investigation: exploration stopped to reserve the final report (${model.reason.toLowerCase().replaceAll('_', ' ')}). Remaining paths and alternatives may be unchecked.`,
+        ...report.unresolvedQuestions.slice(0, 9),
+      ];
+    }
+    if (pending.length) {
+      const ranges = pending
+        .slice(0, 3)
+        .map((range) => `${range.path}:${range.startLine}-${range.endLine}`)
+        .join(', ');
+      report.unresolvedQuestions = [
+        `Requested source remains unread: ${ranges}${pending.length > 3 ? ` (+${pending.length - 3} more ranges)` : ''}. These are coverage gaps, not proof of a defect.`,
         ...report.unresolvedQuestions.slice(0, 9),
       ];
     }

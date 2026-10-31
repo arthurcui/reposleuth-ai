@@ -4,6 +4,49 @@ import { expect, it, vi } from 'vitest';
 
 import { BudgetModel, DEFAULT_LIMITS, emptyUsage } from '../../../src/agents/budget.js';
 
+it('records safe failure metadata while preserving the reservation and making no retry', async () => {
+  const getResponse = vi.fn().mockRejectedValue({ status: 503, message: 'private provider body' });
+  const failed = vi.fn();
+  const usage = emptyUsage();
+  const model = new BudgetModel(
+    {
+      getResponse,
+      getStreamedResponse: () => {
+        throw new Error('unused');
+      },
+    },
+    DEFAULT_LIMITS,
+    usage,
+    () => {},
+    () => {},
+    () => {},
+    undefined,
+    'openai',
+    undefined,
+    undefined,
+    failed,
+  );
+  await expect(
+    model.getResponse({
+      input: 'test',
+      modelSettings: {},
+      tools: [],
+      handoffs: [],
+      outputType: 'text',
+      tracing: false,
+    }),
+  ).rejects.toMatchObject({ code: 'MODEL_REQUEST_FAILED' });
+  expect(failed).toHaveBeenCalledWith({
+    status: 503,
+    category: 'http_response',
+    errorType: 'unknown',
+    transportCode: null,
+  });
+  expect(getResponse).toHaveBeenCalledTimes(1);
+  expect(usage.usageIncomplete).toBe(true);
+  expect(usage.reservedCostUsd).toBeGreaterThan(0);
+});
+
 it.each([
   ['REQUESTS', { requests: 12 }, 'test', {}],
   ['CONTEXT', {}, 'x'.repeat(80000), {}],

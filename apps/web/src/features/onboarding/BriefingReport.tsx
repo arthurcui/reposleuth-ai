@@ -1,5 +1,7 @@
 /** Renders declared facts, literal documentation and explicitly labeled reading suggestions. */
 import { type Briefing, briefingSourceUrl } from '@reposleuth/shared';
+
+import { CodeWalkthrough } from './CodeWalkthrough';
 export function BriefingReport({ report }: { report: Briefing }) {
   const link = (path: string, start?: number, end?: number) => (
     <a href={briefingSourceUrl(report, path, start, end)} target="_blank" rel="noreferrer">
@@ -49,7 +51,8 @@ export function BriefingReport({ report }: { report: Briefing }) {
             </section>
           ))}
           <p>
-            Based on the linked documentation and declarations; runtime behavior is not verified.
+            Based on linked documentation, declarations and any sampled source; runtime behavior is
+            not verified.
           </p>
           {report.summary.uncertainties.length > 0 && (
             <details>
@@ -64,6 +67,22 @@ export function BriefingReport({ report }: { report: Briefing }) {
         </section>
       )}
       {report.summaryError && <p role="status">{report.summaryError}</p>}
+      {report.summaryDiagnostics && (
+        <details>
+          <summary>Explanation validation details</summary>
+          <p>
+            Stage: {report.summaryDiagnostics.stage} · {report.summaryDiagnostics.code}
+          </p>
+          <ul>
+            {report.summaryDiagnostics.issues.map((issue, index) => (
+              <li key={index}>
+                {issue.path}: {issue.code}
+              </li>
+            ))}
+          </ul>
+          <p>Rejected response text is not displayed or exported.</p>
+        </details>
+      )}
       {report.modelUsage?.usageIncomplete && (
         <p>
           Usage is incomplete; ${report.modelUsage.reservedCostUsd.toFixed(4)} remains reserved.
@@ -71,17 +90,19 @@ export function BriefingReport({ report }: { report: Briefing }) {
       )}
       {!report.summary && (
         <section className="briefing-overview">
-          <h3>Start here</h3>
+          <h3>{report.includeOverview ? 'AI overview unavailable' : 'Source details'}</h3>
           <p>
             {report.manifests.find((m) => m.description)?.description ||
               'Start with the project’s own documentation, then inspect the declared setup and packages below.'}
           </p>
           <p>
-            This is the source-facts view. Generate with an enabled model for a synthesized
-            onboarding overview.
+            {report.includeOverview
+              ? 'This briefing collected source details, but did not produce an accepted AI overview. The reason is shown above. These details are not a generated summary.'
+              : 'AI overview was not requested for this briefing. The source details below remain available.'}
           </p>
         </section>
       )}
+      <CodeWalkthrough report={report} />
       <h3>Dive into the details</h3>
       <details className="briefing-deep">
         <summary>Project facts and languages</summary>

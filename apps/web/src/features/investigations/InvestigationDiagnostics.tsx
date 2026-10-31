@@ -53,6 +53,7 @@ function limitText(run: Investigation): string | undefined {
 function actionText(event: InvestigationEvent | undefined): string {
   if (!event) return 'No action recorded in the available activity log.';
   if (event.type === 'reporting') return 'Prepare final report';
+  if (event.type === 'report_correction') return 'Correct report format';
   if (event.type === 'validating' || event.type === 'validation_failed')
     return 'Validate report and citations';
   const name =
@@ -80,13 +81,25 @@ export function InvestigationDiagnostics({
     .filter((event) => event.investigationId === run.id)
     .sort((a, b) => b.id - a.id);
   const reporting = recorded.find((event) => event.type === 'reporting');
-  if (isActive(run.status) || (run.status === 'completed' && !reporting)) return null;
+  const correction = recorded.find((event) => event.type === 'report_correction');
+  const partial = !!reporting || run.report?.verification?.coverage === 'partial';
+  if (isActive(run.status) || (run.status === 'completed' && !partial && !correction)) return null;
   const last = recorded.find((event) =>
-    ['tool_started', 'tool_finished', 'validating', 'validation_failed', 'reporting'].includes(
-      event.type,
-    ),
+    [
+      'tool_started',
+      'tool_finished',
+      'validating',
+      'validation_failed',
+      'reporting',
+      'report_correction',
+    ].includes(event.type),
   );
   const validation = recorded.find((event) => event.type === 'validation_failed');
+  const corrected =
+    run.status === 'completed' &&
+    correction?.data.status === 'shape_valid' &&
+    validation &&
+    correction.id > validation.id;
   const files = new Map<string, { url: string | null }>();
   for (const event of recorded) {
     const { path, startLine, endLine, commitSha } = event.data;
@@ -128,7 +141,11 @@ export function InvestigationDiagnostics({
   return (
     <section className="investigation-diagnostics" aria-labelledby="diagnostics-title">
       <h3 id="diagnostics-title">
-        {run.status === 'completed' ? 'Partial investigation' : 'Why this investigation stopped'}
+        {run.status === 'completed'
+          ? partial
+            ? 'Partial investigation'
+            : 'Investigation details'
+          : 'Why this investigation stopped'}
       </h3>
       {run.errorCode && <p className="notice error">{errorMessage(run.errorCode)}</p>}
       {limit && (
@@ -140,7 +157,10 @@ export function InvestigationDiagnostics({
       <p>
         <strong>Last tool or reporting action:</strong> {actionText(last)}
       </p>
-      {rejected && (
+      {corrected && (
+        <p>The earlier response was rejected. The corrected report passed validation.</p>
+      )}
+      {rejected && !corrected && (
         <p>
           <strong>Validation:</strong> {rejected}
         </p>
