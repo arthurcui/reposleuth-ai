@@ -4,15 +4,23 @@ import { healthSchema } from '@reposleuth/shared';
 import Fastify from 'fastify';
 
 import type { ModelCatalogService } from './agents/modelCatalog.js';
+import type { BriefingService } from './onboarding/BriefingService.js';
+import { registerBriefings } from './onboarding/routes.js';
 import { registerInvestigations } from './routes/investigations.js';
 import type { InvestigationService } from './services/investigationService.js';
 import type { InvestigationStore } from './storage/sqlite.js';
 
 export function buildApp(
   service?: InvestigationService,
-  options: { webRoot?: string; store?: InvestigationStore; catalog?: ModelCatalogService } = {},
+  options: {
+    webRoot?: string;
+    store?: InvestigationStore;
+    catalog?: ModelCatalogService;
+    briefings?: BriefingService;
+  } = {},
 ) {
   const app = Fastify({ logger: false, bodyLimit: 16384 });
+  if (options.briefings) app.addHook('preClose', async () => options.briefings!.drain());
   app.addHook('onRequest', async (req, reply) => {
     // Loopback-only API: reject DNS rebinding and browser cross-origin requests.
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host ?? ''))
@@ -35,6 +43,7 @@ export function buildApp(
     reply.header('Cache-Control', 'no-store');
   });
   registerInvestigations(app, service, options.store, options.catalog);
+  registerBriefings(app, options.briefings);
   if (options.webRoot) {
     void app.register(fastifyStatic, {
       root: options.webRoot,

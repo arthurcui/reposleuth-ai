@@ -8,10 +8,12 @@ export function ModelPicker({
   value,
   onChange,
   disabled,
+  label = 'Investigation model',
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
+  label?: string;
 }) {
   const [catalog, setCatalog] = useState<ModelCatalog | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,7 +45,7 @@ export function ModelPicker({
   const selected = catalog?.models.find((m) => `${m.provider}:${m.model}` === value);
   return (
     <div className="model-picker">
-      <label htmlFor="investigation-model">Investigation model</label>
+      <label htmlFor="investigation-model">{label}</label>
       <select
         id="investigation-model"
         value={value}
