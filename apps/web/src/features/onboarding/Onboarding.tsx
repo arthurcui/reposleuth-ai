@@ -203,7 +203,7 @@ export function Onboarding() {
           </form>
           {report?.status === 'running' && (
             <p role="status">
-              Discovering files and reading documentation and manifests. You can reopen this
+              Reading documentation, manifests and a bounded source route. You can reopen this
               briefing from history.
             </p>
           )}

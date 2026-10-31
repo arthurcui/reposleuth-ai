@@ -228,6 +228,9 @@ export function InvestigationActivity({ workspace }: { workspace: InvestigationW
                     </span>
                   )}
                   {typeof event.data.outcome === 'string' && <span>{event.data.outcome}</span>}
+                  {event.type === 'report_correction' && typeof event.data.status === 'string' && (
+                    <span>{event.data.status.replaceAll('_', ' ')}</span>
+                  )}
                 </div>
               </li>
             ))}

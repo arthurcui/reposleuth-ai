@@ -5,6 +5,7 @@ import type { Briefing } from '@reposleuth/shared';
 import { z } from 'zod';
 
 import type { RepositoryProvider, SourceFile } from '../github/RepositoryProvider.js';
+import { readCodePath } from './readCodePath.js';
 
 const manifestSchema = z.object({
   name: z.string().optional(),
@@ -94,12 +95,14 @@ export async function buildBriefing(
     .filter((p) => /^(readme|contributing)(\.[^.]+)?$/i.test(posix.basename(p)))
     .sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
   let readCalls = 0;
+  let readingCode = false;
   const read = async (path: string, start: number): Promise<SourceFile | undefined> => {
     check();
-    if (++readCalls > 24) {
+    if (readCalls >= (readingCode ? 24 : 18)) {
       warnings.add('Source reading allowance exhausted.');
       return;
     }
+    readCalls++;
     try {
       const source = await repository.readFile(path, start, start + 199);
       check();
@@ -227,6 +230,8 @@ export async function buildBriefing(
   warnings.add(
     'Commands are copied from manifests, not executed. Documentation is quoted, not independently verified. Any AI overview is a separately labeled interpretation.',
   );
+  readingCode = true;
+  await readCodePath(result, unique, read);
   result.limitations = [...warnings];
   check();
   return result;

@@ -59,7 +59,7 @@ export function createTools(
         name,
         outcome: resultError ? (value.error === 'OUTPUT_LIMIT' ? 'output_limit' : 'error') : 'ok',
       });
-      working?.record(name, output);
+      working?.record(name, output, details);
       return output;
     } catch (error) {
       if (error instanceof StopError) throw error;
@@ -158,15 +158,18 @@ export function createTools(
       }),
       errorFunction: null,
       execute: ({ prefix, offset }) =>
-        invoke('list_files', async () =>
-          listingPage(
-            await repository.listFiles(
-              prefix === '.' || prefix === './' ? '' : prefix,
+        invoke(
+          'list_files',
+          async () =>
+            listingPage(
+              await repository.listFiles(
+                prefix === '.' || prefix === './' ? '' : prefix,
+                offset ?? 0,
+              ),
               offset ?? 0,
+              outputByteLimit(),
             ),
-            offset ?? 0,
-            outputByteLimit(),
-          ),
+          { prefix, offset: offset ?? 0 },
         ),
     }),
     tool({
@@ -176,7 +179,10 @@ export function createTools(
       parameters: z.object({ query: z.string().min(2).max(200), scope }),
       errorFunction: null,
       execute: ({ query, scope }) =>
-        invoke('find_files', () => repository.findFiles(query, scope ?? '')),
+        invoke('find_files', () => repository.findFiles(query, scope ?? ''), {
+          query,
+          scope: scope ?? '',
+        }),
     }),
     tool({
       name: 'search_code',
@@ -218,14 +224,15 @@ export function createTools(
     tool({
       name: 'read_definition',
       description:
-        'Read a named TS/JS definition from an outline, beginning at its implementation. Specify startLine for overloads/duplicates. Returns bounded evidence and nextStartLine if shortened. C# lexical anchors require read_file.',
+        'Read a named TS/JS implementation. Optional focus selects a matching call inside that body (for example a callee seen in an outline), instead of repeatedly reading its beginning. Specify startLine for duplicate implementations. Returns exact evidence and continuation; C# anchors require read_file.',
       parameters: z.object({
         path,
         name: z.string().min(1).max(120),
         startLine: z.number().int().positive().nullable().optional(),
+        focus: z.string().min(1).max(120).nullable().optional(),
       }),
       errorFunction: null,
-      execute: ({ path, name, startLine }) =>
+      execute: ({ path, name, startLine, focus }) =>
         invoke(
           'read_definition',
           async () => {
@@ -255,7 +262,26 @@ export function createTools(
                   'Choose an implementation startLine or use outline/search. Declarations are not executable bodies.',
               };
             const definition = matches[0]!;
-            return readWindow(path, definition.startLine, definition.endLine, {
+            let from = definition.startLine;
+            let to = definition.endLine;
+            if (focus) {
+              const focused = await repository.outlineFile(path, focus);
+              const locations = focused.calls.filter(
+                (call) => call.line >= definition.startLine && call.line <= definition.endLine,
+              );
+              if (locations.length !== 1)
+                return {
+                  error: locations.length ? 'AMBIGUOUS_FOCUS' : 'FOCUS_NOT_FOUND',
+                  candidates: locations,
+                  truncated: focused.truncated,
+                  message:
+                    'Choose a returned location with read_file, or a more specific focus. No source was read.',
+                };
+              from = Math.max(definition.startLine, locations[0]!.line - 8);
+              to = Math.min(definition.endLine, locations[0]!.line + 50);
+            }
+            return readWindow(path, from, to, {
+              definitionStartLine: definition.startLine,
               definitionEndLine: definition.endLine,
               resolvedFromDeclaration: startLine != null && startLine !== definition.startLine,
             });
