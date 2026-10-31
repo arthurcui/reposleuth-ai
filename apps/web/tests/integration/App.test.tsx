@@ -3,10 +3,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from '../../src/App';
 import { demo, demoCases } from '../../src/features/demo/demo';
 import { sourceUrl } from '../../src/features/investigations/client';
 import { Report } from '../../src/features/investigations/Report';
+import { InvestigationApp as App } from '../../src/InvestigationApp';
 // Provider discovery interactions are covered independently in ModelPicker.test.tsx.
 vi.mock('../../src/features/investigations/ModelPicker', () => ({ ModelPicker: () => null }));
 

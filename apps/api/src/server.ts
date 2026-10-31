@@ -8,6 +8,8 @@ import { liveModel } from './agents/models/createModel.js';
 import { providerConfig } from './agents/provider.js';
 import { buildApp } from './app.js';
 import { OctokitProvider } from './github/OctokitProvider.js';
+import { BriefingService } from './onboarding/BriefingService.js';
+import { summarizeBriefing } from './onboarding/summarize.js';
 import { InvestigationService } from './services/investigationService.js';
 import { InvestigationStore } from './storage/sqlite.js';
 
@@ -46,6 +48,36 @@ const service =
       )
     : undefined;
 const app = buildApp(service, {
+  briefings:
+    process.env.DEMO_ONLY === '1'
+      ? undefined
+      : new BriefingService(
+          fileURLToPath(new URL('../../../data/briefings.sqlite', import.meta.url)),
+          (repository) => OctokitProvider.connect(repository, { token: process.env.GITHUB_TOKEN }),
+          async (report, request) => {
+            try {
+              const selected = request.selection
+                ? await catalog.resolve(request.selection)
+                : provider;
+              const key = keys[selected.provider];
+              if (!key)
+                return {
+                  ...report,
+                  summaryError:
+                    'Configure a model API key on the server to generate the readable overview. Source details remain available.',
+                };
+              return await summarizeBriefing(report, liveModel(key, selected), selected, (usd) =>
+                store.reserve(usd, appBudget),
+              );
+            } catch {
+              return {
+                ...report,
+                summaryError:
+                  'Selected model is unavailable. Choose an enabled model and generate a new briefing.',
+              };
+            }
+          },
+        ),
   store,
   catalog,
   ...(process.env.SERVE_WEB === '1'

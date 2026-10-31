@@ -3,8 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { App } from '../../src/App';
 import { demo } from '../../src/features/demo/demo';
+import { InvestigationApp as App } from '../../src/InvestigationApp';
 
 afterEach(() => {
   cleanup();

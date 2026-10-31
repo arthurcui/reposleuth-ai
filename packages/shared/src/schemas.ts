@@ -1,6 +1,8 @@
 /** Defines validated request, report, event, and usage contracts shared by the API and UI. */
 import { z } from 'zod';
 
+export * from './briefing.js';
+
 export const healthSchema = z.object({
   status: z.literal('ok'),
   service: z.literal('reposleuth-api'),

@@ -9,6 +9,121 @@
   width: 100%;
   min-width: 0;
 }
+.onboarding-report {
+  margin-top: 32px;
+  overflow-wrap: anywhere;
+}
+.onboarding-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.onboarding-workspace > .panel {
+  max-width: 100%;
+}
+.briefing-history .history-list > li {
+  padding: 12px 0;
+}
+.briefing-history .history-list button {
+  width: auto;
+  margin: 0;
+  padding: 8px 16px;
+}
+.briefing-history .history-list p {
+  margin: 6px 0;
+}
+.briefing-prose {
+  font-size: 1.08rem;
+  line-height: 1.85;
+  max-width: 80ch;
+  white-space: pre-line;
+}
+.briefing-overview {
+  border-top: 1px solid #29374c;
+  padding: 14px 0 28px;
+}
+.briefing-citations {
+  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.briefing-deep {
+  border-top: 1px solid #29374c;
+  padding: 8px 0;
+}
+.briefing-deep > summary {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.briefing-explain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.briefing-explain input {
+  width: auto;
+  margin: 0;
+}
+.briefing-form > summary {
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+.briefing-intro-compact {
+  padding: 24px 0;
+}
+.briefing-intro-compact h1 {
+  font-size: 32px;
+  margin: 10px 0;
+}
+.briefing-intro-compact h1 br {
+  display: none;
+}
+.briefing-intro-compact .description {
+  display: none;
+}
+.onboarding-report h3 {
+  margin-top: 36px;
+  color: #78d9bf;
+}
+.onboarding-report li {
+  margin: 10px 0;
+}
+.briefing-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.briefing-map > div {
+  background: #0b1422;
+  padding: 16px;
+  border-radius: 8px;
+}
+.briefing-map span {
+  display: block;
+  margin-top: 8px;
+}
+.briefing-package {
+  border-top: 1px solid #29374c;
+  padding: 18px 0;
+}
+.briefing-package dd {
+  margin: 6px 0 18px;
+  white-space: pre-wrap;
+}
+.briefing-document {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 420px;
+  overflow: auto;
+  padding: 16px;
+  background: #0b1422;
+}
+.onboarding-report summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
 .model-picker select {
   width: 100%;
   min-height: 52px;
@@ -89,6 +204,54 @@ header {
   text-decoration: none;
   font-size: 23px;
   font-weight: 700;
+}
+.workspace-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 20px 0;
+  padding: 5px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid #29374c;
+  border-radius: 12px;
+  background: #101827;
+}
+.workspace-navigation a {
+  padding: 12px 18px;
+  border-radius: 8px;
+  color: #aebed1;
+  text-decoration: none;
+  font-weight: 600;
+}
+.workspace-navigation a:hover {
+  background: #1a293c;
+  color: #e7eff9;
+}
+.workspace-navigation a[aria-current='page'] {
+  background: #78d9bf;
+  color: #10251f;
+}
+.workspace-navigation a:focus-visible {
+  outline: 2px solid #78d9bf;
+  outline-offset: 3px;
+}
+.experimental-label {
+  font-size: 0.82em;
+  font-weight: 400;
+}
+@media (max-width: 480px) {
+  .workspace-navigation {
+    width: 100%;
+  }
+  .workspace-navigation a {
+    flex: 1;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .experimental-label {
+    display: block;
+  }
 }
 .brand span,
 h1 span {
